@@ -220,7 +220,7 @@ export default function Home() {
             </div>
             <div className="p-8">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900 dark:to-blue-900 p-6 rounded-lg">
+                <div className="bg-gradient-to-br from-gray-50 to-blue-50 dark:from-indigo-900 dark:to-blue-900 p-6 rounded-lg">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-gray-900 dark:text-white">
                       TechCorp
@@ -502,7 +502,7 @@ export default function Home() {
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to track your brand's AI visibility?
           </h2>
-          <p className="text-xl text-indigo-100 mb-8">
+          <p className="text-xl text-gray-100 mb-8">
             Join hundreds of brands already using BrandViz to optimize their AI
             presence.
           </p>
@@ -513,7 +513,7 @@ export default function Home() {
             Start Your Free Trial
             <ArrowRight className="ml-2 w-5 h-5" />
           </Link>
-          <p className="text-indigo-200 mt-4 text-sm">
+          <p className="text-gray-100 mt-4 text-sm">
             14-day free trial • No credit card required
           </p>
         </div>
