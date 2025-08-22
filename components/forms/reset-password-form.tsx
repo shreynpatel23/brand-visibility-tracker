@@ -15,8 +15,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import Loading from "../loading";
+import { postData } from "@/utils/fetch";
+import ApiError from "../api-error";
 
 const formSchema = z
   .object({
@@ -32,15 +34,17 @@ const formSchema = z
 
 export function ResetPasswordForm({
   token,
+  id,
   onSuccess,
 }: {
   token: string;
+  id: string;
   onSuccess: () => void;
 }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,12 +58,16 @@ export function ResetPasswordForm({
     setLoading(true);
 
     try {
+      const { password } = values;
       // Simulate API call for password reset
-      console.log("Resetting password with token:", token);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await postData("/api/reset-password", {
+        token,
+        id,
+        newPassword: password,
+      });
       onSuccess();
     } catch (error) {
-      console.error("Failed to reset password:", error);
+      setError(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -138,9 +146,22 @@ export function ResetPasswordForm({
           </div>
         </div>
 
+        {error && (
+          <ApiError message={error} setMessage={(value) => setError(value)} />
+        )}
+
         <div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Updating password..." : "Update password"}
+          <Button
+            type="submit"
+            disabled={loading}
+            variant={loading ? "outline" : "default"}
+            className="w-full"
+          >
+            {loading ? (
+              <Loading message="Updating password..." />
+            ) : (
+              "Update password"
+            )}
           </Button>
         </div>
       </form>

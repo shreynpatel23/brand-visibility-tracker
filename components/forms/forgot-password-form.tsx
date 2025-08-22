@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Loading from "../loading";
+import { postData } from "@/utils/fetch";
+import ApiError from "../api-error";
 
 const formSchema = z.object({
   email: z.string().min(2, {
@@ -28,8 +30,8 @@ export function ForgotPasswordForm({
 }: {
   onSuccess: (email: string) => void;
 }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -42,10 +44,13 @@ export function ForgotPasswordForm({
     setLoading(true);
 
     try {
-      console.log("Sending password reset email to:", values.email);
+      const { email } = values;
+      await postData("/api/forgot-password", {
+        email,
+      });
       onSuccess(values.email);
     } catch (error) {
-      console.error("Send Email failed:", error);
+      setError(error instanceof Error ? error.message : "Unknown error");
     } finally {
       setLoading(false);
     }
@@ -75,10 +80,18 @@ export function ForgotPasswordForm({
             )}
           />
         </div>
+        {error && (
+          <ApiError message={error} setMessage={(value) => setError(value)} />
+        )}
 
         <div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Sending..." : "Send reset link"}
+          <Button
+            type="submit"
+            variant={loading ? "outline" : "default"}
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? <Loading message="Sending..." /> : "Send reset link"}
           </Button>
         </div>
       </form>

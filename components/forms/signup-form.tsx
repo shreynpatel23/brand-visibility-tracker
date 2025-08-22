@@ -14,12 +14,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/context/auth-context";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Checkbox } from "../ui/checkbox";
 import Link from "next/link";
+import Loading from "../loading";
+import { postData } from "@/utils/fetch";
+import ApiError from "../api-error";
 
 const formSchema = z
   .object({
@@ -34,6 +36,7 @@ const formSchema = z
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
+    path: ["confirmPassword"],
     message: "Passwords do not match",
   });
 
@@ -42,7 +45,7 @@ export function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
+  const [error, setError] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,10 +62,31 @@ export function SignupForm() {
     setLoading(true);
 
     try {
-      await signup(values.name, values.email, values.password);
-      router.push("/onboarding");
+      const { name, email, password } = values;
+      const response = await postData("/api/register", {
+        full_name: name,
+        email,
+        password,
+      });
+      const { data } = response;
+      const { user } = data;
+      if (user) {
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.setItem("userId", user._id);
+            localStorage.setItem("token", user.token);
+          }
+        } catch (error) {
+          console.error("Error while setting token in localStorage:", error);
+        }
+      }
+      router.push("/verify-email?email=" + encodeURIComponent(values.email));
     } catch (error) {
-      console.error("Signup failed:", error);
+      setError(
+        `Signup failed - ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setLoading(false);
     }
@@ -217,9 +241,22 @@ export function SignupForm() {
           />
         </div>
 
+        {error && (
+          <ApiError message={error} setMessage={(value) => setError(value)} />
+        )}
+
         <div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Creating Account..." : "Create Account"}
+          <Button
+            type="submit"
+            variant={loading ? "outline" : "default"}
+            disabled={loading}
+            className="w-full"
+          >
+            {loading ? (
+              <Loading message="Creating Account..." />
+            ) : (
+              "Create Account"
+            )}
           </Button>
         </div>
       </form>

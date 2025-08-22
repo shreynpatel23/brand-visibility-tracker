@@ -14,12 +14,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/context/auth-context";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Loading from "../loading";
+import { postData } from "@/utils/fetch";
+import ApiError from "../api-error";
+import { redirectToCurrentOnboardingStep } from "@/utils/mapCurrentOnboardingStep";
 
 const formSchema = z.object({
   email: z.string().min(2, {
@@ -35,7 +38,7 @@ export function LoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [error, setError] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -50,10 +53,23 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      await login(values.email, values.password);
-      router.push("/dashboard");
+      const { email, password } = values;
+      const response = await postData("/api/login", {
+        email,
+        password,
+      });
+      const { data } = response;
+      const url = redirectToCurrentOnboardingStep(
+        data.current_onboarding_step,
+        data
+      );
+      router.push(url);
     } catch (error) {
-      console.error("Login failed:", error);
+      setError(
+        `Login failed - ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setLoading(false);
     }
@@ -151,9 +167,18 @@ export function LoginForm() {
           </div>
         </div>
 
+        {error && (
+          <ApiError message={error} setMessage={(value) => setError(value)} />
+        )}
+
         <div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Signing in..." : "Sign in"}
+          <Button
+            type="submit"
+            disabled={loading}
+            variant={loading ? "outline" : "default"}
+            className="w-full"
+          >
+            {loading ? <Loading message="Signing in..." /> : "Sign in"}
           </Button>
         </div>
       </form>

@@ -1,14 +1,14 @@
 import { Suspense } from "react";
-import ResetPassword from ".";
 import Loading from "@/components/loading";
+import EmailVerificationPage from ".";
 
 function SuspenseFallback() {
-  return <Loading message="Loading reset password page..." />;
+  return <Loading message="Loading email verification page..." />;
 }
 export default function Page() {
   return (
     <Suspense fallback={<SuspenseFallback />}>
-      <ResetPassword />
+      <EmailVerificationPage />
     </Suspense>
   );
 }
