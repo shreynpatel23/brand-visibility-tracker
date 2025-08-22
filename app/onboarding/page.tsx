@@ -7,6 +7,7 @@ import {
   OnboardingForm,
 } from "@/components/forms/onboarding-form";
 import Logo from "@/components/logo";
+import { ModeToggle } from "@/components/mode-toggle";
 import { ArrowLeft, ArrowRight, Users } from "lucide-react";
 import { useState } from "react";
 
@@ -14,7 +15,10 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<IOnboardingForm>();
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <div className="absolute top-10 right-10">
+        <ModeToggle />
+      </div>
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center my-8">

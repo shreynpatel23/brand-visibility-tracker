@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ResetPasswordForm } from "@/components/forms/reset-password-form";
 import Logo from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { ModeToggle } from "@/components/mode-toggle";
 
 const ResetPasswordPage: React.FC = () => {
   const router = useRouter();
@@ -15,7 +16,10 @@ const ResetPasswordPage: React.FC = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+        <div className="absolute top-10 right-10">
+          <ModeToggle />
+        </div>
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="flex justify-center mb-6">
@@ -38,7 +42,10 @@ const ResetPasswordPage: React.FC = () => {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+        <div className="absolute top-10 right-10">
+          <ModeToggle />
+        </div>
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">
@@ -60,7 +67,10 @@ const ResetPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <div className="absolute top-10 right-10">
+        <ModeToggle />
+      </div>
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center">
