@@ -22,6 +22,7 @@ import Link from "next/link";
 import Loading from "../loading";
 import { postData } from "@/utils/fetch";
 import ApiError from "../api-error";
+import { useUserContext } from "@/context/userContext";
 
 const formSchema = z
   .object({
@@ -46,6 +47,9 @@ export function SignupForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // context
+  const { setUser } = useUserContext();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -79,6 +83,7 @@ export function SignupForm() {
         } catch (error) {
           console.error("Error while setting token in localStorage:", error);
         }
+        setUser(user);
       }
       router.push("/verify-email?email=" + encodeURIComponent(values.email));
     } catch (error) {

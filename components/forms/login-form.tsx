@@ -23,6 +23,7 @@ import Loading from "../loading";
 import { postData } from "@/utils/fetch";
 import ApiError from "../api-error";
 import { redirectToCurrentOnboardingStep } from "@/utils/mapCurrentOnboardingStep";
+import { useUserContext } from "@/context/userContext";
 
 const formSchema = z.object({
   email: z.string().min(2, {
@@ -39,6 +40,7 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { setUser } = useUserContext();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -59,6 +61,15 @@ export function LoginForm() {
         password,
       });
       const { data } = response;
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("userId", data._id);
+          localStorage.setItem("token", data.token);
+        }
+      } catch (error) {
+        console.error("Error while setting token in localStorage:", error);
+      }
+      setUser(data);
       const url = redirectToCurrentOnboardingStep(
         data.current_onboarding_step,
         data

@@ -40,7 +40,7 @@ export function InviteTeamMemberForm({
     // Here you would normally save the data to your backend
     console.log("form data:", formData);
     console.log("Team members:", teamMembers);
-    router.push("/dashboard");
+    router.push("/brand/dashboard");
   };
 
   return (
