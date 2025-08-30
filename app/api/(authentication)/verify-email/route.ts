@@ -47,7 +47,7 @@ export async function GET(reqeust: Request) {
 
     // redirect to the onboarding steps with user id
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/application/${user?._id}/onboarding`
+      `${process.env.NEXT_PUBLIC_BASE_URL}/${user?._id}/onboarding`
     );
   } catch (error) {
     return new NextResponse("Error in verify user " + error, { status: 500 });

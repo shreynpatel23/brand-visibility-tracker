@@ -5,24 +5,27 @@ import { useState } from "react";
 import { IOnboardingForm } from "./onboarding-form";
 import { useRouter } from "next/navigation";
 import { Button } from "../ui/button";
+import { postData } from "@/utils/fetch";
+import ApiError from "../api-error";
+import Loading from "../loading";
 
 export function InviteTeamMemberForm({
+  userId,
   formData,
-  currentStep,
-  setCurrentStep,
 }: {
+  userId: string;
   formData: IOnboardingForm | undefined;
-  currentStep: number;
-  setCurrentStep: (step: number) => void;
 }) {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const roles = ["Admin", "Viewer"];
   const [teamMembers, setTeamMembers] = useState([
-    { email: "", role: "Editor" },
+    { email: "", role: roles[0] },
   ]);
-  const roles = ["Admin", "Editor", "Viewer"];
+  const [error, setError] = useState<string | null>(null);
 
   const addTeamMember = () => {
-    setTeamMembers([...teamMembers, { email: "", role: "Editor" }]);
+    setTeamMembers([...teamMembers, { email: "", role: roles[0] }]);
   };
 
   const updateTeamMember = (index: number, field: string, value: string) => {
@@ -36,11 +39,31 @@ export function InviteTeamMemberForm({
     setTeamMembers(teamMembers.filter((_, i) => i !== index));
   };
 
-  const handleComplete = () => {
-    // Here you would normally save the data to your backend
-    console.log("form data:", formData);
-    console.log("Team members:", teamMembers);
-    router.push("/brand/dashboard");
+  const handleComplete = async () => {
+    setLoading(true);
+    try {
+      const response = await postData(`/api/brand/${formData?._id}/invites`, {
+        emails: teamMembers.map((member) => ({
+          email: member.email.toLowerCase(),
+          role: member.role.toLowerCase(),
+        })),
+        user_id: userId,
+      });
+      const { data } = response;
+      if (data[0]?.status === "invited") {
+        router.push(`/${userId}/brands`);
+      } else {
+        setError(data[0]?.message);
+      }
+    } catch (error) {
+      setError(
+        `invite memeber failed - ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -90,19 +113,29 @@ export function InviteTeamMemberForm({
         </button>
       </div>
 
+      {error && (
+        <ApiError message={error} setMessage={(value) => setError(value)} />
+      )}
+
       <div className="flex justify-between mt-8">
         <Button
           variant={"outline"}
-          onClick={() => setCurrentStep(currentStep - 1)}
+          onClick={() => router.push(`/${userId}/brands`)}
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
+          Skip for now
         </Button>
-        <div className="ml-auto space-x-3">
-          <Button variant={"outline"} onClick={handleComplete}>
-            Skip for now
+        <div className="ml-auto">
+          <Button
+            disabled={loading || !formData?._id}
+            variant={loading ? "outline" : "default"}
+            onClick={handleComplete}
+          >
+            {loading ? (
+              <Loading message="Inviting members..." />
+            ) : (
+              "Go to Dashboard"
+            )}
           </Button>
-          <Button onClick={handleComplete}>Go to Dashboard</Button>
         </div>
       </div>
     </>

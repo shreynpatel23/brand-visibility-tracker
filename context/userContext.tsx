@@ -1,26 +1,10 @@
 "use client";
 import Loading from "@/components/loading";
+import { IUser } from "@/lib/models/user";
 import { fetchData } from "@/utils/fetch";
 import { redirectToCurrentOnboardingStep } from "@/utils/mapCurrentOnboardingStep";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
-
-export interface IUser {
-  _id: string;
-  full_name: string;
-  email: string;
-  is_verified: boolean;
-  verify_token?: string;
-  verify_token_expire?: Date;
-  number_of_retries?: number;
-  reset_password_token?: string;
-  reset_password_expire?: Date;
-  plan_id: {
-    _id: string;
-    plan_id: string;
-    plan_name: string;
-  };
-}
 
 export const INITIAL_USER_STATE: IUser = {
   _id: "",
@@ -51,6 +35,7 @@ const authPathNames = [
   "/register",
   "/forgot-password",
   "/reset-password",
+  "/accept-invite",
 ];
 
 export function UserContext({ children }: { children: React.ReactNode }) {
@@ -70,13 +55,17 @@ export function UserContext({ children }: { children: React.ReactNode }) {
         const { data } = response;
         setUser(data);
         // utils for redirecting to the current onboarding step
-        if (authPathNames.includes(pathname)) {
+        const matchesAuthPath = authPathNames.some((authPath) =>
+          pathname.endsWith(authPath)
+        );
+
+        if (matchesAuthPath) {
           return;
         }
-        const url = redirectToCurrentOnboardingStep(
-          data.current_onboarding_step,
-          data
-        );
+        const url = redirectToCurrentOnboardingStep({
+          currentOnboardingStep: data.current_onboarding_step,
+          data,
+        });
         router.push(url);
       } catch (err: any) {
         router.push("/login");

@@ -1,19 +1,60 @@
-// app/onboarding/page.tsx
 "use client";
 
+import ApiError from "@/components/api-error";
 import { InviteTeamMemberForm } from "@/components/forms/invite-member-form";
-import {
-  IOnboardingForm,
-  OnboardingForm,
-} from "@/components/forms/onboarding-form";
+import { IOnboardingForm } from "@/components/forms/onboarding-form";
+import Loading from "@/components/loading";
 import Logo from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
-import { ArrowLeft, ArrowRight, Users } from "lucide-react";
-import { useState } from "react";
+import { fetchData } from "@/utils/fetch";
+import { Users } from "lucide-react";
+import { useEffect, useState } from "react";
 
-export default function OnboardingPage() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<IOnboardingForm>();
+export default function InviteMemberPage({
+  userId,
+  brandId,
+}: {
+  userId: string;
+  brandId: string;
+}) {
+  const [currentStep] = useState(2);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<IOnboardingForm | undefined>(
+    undefined
+  );
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchBrand() {
+      try {
+        const response = await fetchData(`/api/brand/${brandId}`);
+        const { data } = response;
+        setFormData(data);
+      } catch (error) {
+        setError(
+          `Error in creating brand - ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (brandId && userId) {
+      setLoading(true);
+      fetchBrand();
+    }
+  }, [userId, brandId]);
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center">
+        <Loading message="Fetching brand details..." />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
       <div className="absolute top-10 right-10">
@@ -74,23 +115,6 @@ export default function OnboardingPage() {
 
         {/* Step Content */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          {currentStep === 1 && (
-            <div className="space-y-4">
-              <div className="text-center mt-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Create Your First Brand
-                </h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">
-                  Tell us about the brand you want to track
-                </p>
-              </div>
-              <OnboardingForm
-                setCurrentStep={setCurrentStep}
-                onContinue={(value: IOnboardingForm) => setFormData(value)}
-              />
-            </div>
-          )}
-
           {currentStep === 2 && (
             <div className="space-y-6">
               <div className="text-center">
@@ -103,11 +127,13 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              <InviteTeamMemberForm
-                formData={formData}
-                currentStep={currentStep}
-                setCurrentStep={setCurrentStep}
-              />
+              {error && (
+                <ApiError
+                  message={error}
+                  setMessage={(value) => setError(value)}
+                />
+              )}
+              <InviteTeamMemberForm userId={userId} formData={formData} />
             </div>
           )}
         </div>

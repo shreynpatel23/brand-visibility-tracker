@@ -1,10 +1,9 @@
 import connect from "@/lib/db";
 import crypto from "crypto";
-import User from "@/lib/models/user";
+import User, { IUser } from "@/lib/models/user";
 import { NextResponse } from "next/server";
 import { verificationEmailTemplate } from "@/utils/verificationEmailTempelate";
 import { sendEmail } from "@/utils/sendEmail";
-import { IUser } from "@/context/userContext";
 
 function getVerificationToken(user: IUser): string {
   // Generate the token

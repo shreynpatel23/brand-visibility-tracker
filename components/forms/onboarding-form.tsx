@@ -23,7 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TagInput } from "../tag-input";
-import { ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { postData } from "@/utils/fetch";
+import ApiError from "../api-error";
+import Loading from "../loading";
 
 const categories = [
   "Technology",
@@ -44,6 +47,7 @@ const regions = [
 ];
 
 export interface IOnboardingForm {
+  _id: string;
   name: string;
   category: string;
   region: string;
@@ -65,12 +69,16 @@ const formSchema = z.object({
 });
 
 export function OnboardingForm({
+  userId,
   setCurrentStep,
   onContinue,
 }: {
+  userId: string;
   setCurrentStep: (step: number) => void;
   onContinue: (data: IOnboardingForm) => void;
 }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -83,6 +91,42 @@ export function OnboardingForm({
       features: [],
     },
   });
+
+  async function handleCreateBrand(data: z.infer<typeof formSchema>) {
+    const {
+      name,
+      category,
+      region,
+      competitors,
+      features,
+      targetAudience,
+      useCase,
+    } = data;
+    setLoading(true);
+    try {
+      const response = await postData(`/api/brand`, {
+        user_id: userId,
+        name,
+        category,
+        region,
+        competitors,
+        use_case: useCase,
+        target_audience: targetAudience,
+        feature_list: features,
+      });
+      const { data } = response;
+      setCurrentStep(2);
+      onContinue(data.brand);
+    } catch (error) {
+      setError(
+        `Error in creating brand - ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto py-8">
@@ -220,15 +264,20 @@ export function OnboardingForm({
               )}
             />
           </div>
+
+          {error && (
+            <ApiError message={error} setMessage={(value) => setError(value)} />
+          )}
+
           {/* Navigation */}
           <div className="flex justify-center">
             <Button
               type="button"
               className="w-[200px]"
               onClick={() => {
-                setCurrentStep(2);
-                onContinue(form.getValues());
+                handleCreateBrand(form.getValues());
               }}
+              variant={loading ? "outline" : "default"}
               disabled={
                 !form.watch("name") ||
                 !form.watch("category") ||
@@ -236,10 +285,11 @@ export function OnboardingForm({
                 !form.watch("targetAudience") ||
                 !form.watch("competitors") ||
                 !form.watch("useCase") ||
-                !form.watch("features")
+                !form.watch("features") ||
+                loading
               }
             >
-              Continue <ArrowRight className="w-4 h-4 ml-1" />
+              {loading ? <Loading message="Creating brand..." /> : "Continue"}
             </Button>
           </div>
         </form>

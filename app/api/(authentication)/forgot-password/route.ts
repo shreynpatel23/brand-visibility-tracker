@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import connect from "@/lib/db";
-import User from "@/lib/models/user";
+import User, { IUser } from "@/lib/models/user";
 import { resetPasswordEmailTemplate } from "@/utils/resetPasswordEmailTempelate";
-import { IUser } from "@/context/userContext";
 import { sendEmail } from "@/utils/sendEmail";
 
 function getVerificationToken(user: IUser): string {

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { isRouteProtected } from "./utils/checkProtectedRoutes";
 
 export const config = {
-  matcher: ["/api/:path*", "/brand/:path*"],
+  matcher: ["/api/:path*", "/brands/:path*"],
 };
 
 export default async function middleware(request: NextRequest) {

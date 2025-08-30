@@ -1,6 +1,25 @@
 import { Schema, model, models } from "mongoose";
 
-const UserSchema = new Schema(
+export interface IUser {
+  _id: string;
+  full_name: string;
+  email: string;
+  password?: string;
+  is_verified: boolean;
+  verify_token?: string;
+  verify_token_expire?: Date;
+  current_onboarding_step?: string | null;
+  number_of_retries?: number;
+  reset_password_token?: string;
+  reset_password_expire?: Date;
+  plan_id: {
+    _id: string;
+    plan_id: string;
+    plan_name: string;
+  };
+}
+
+const UserSchema = new Schema<IUser>(
   {
     full_name: {
       type: String,
@@ -47,5 +66,5 @@ const UserSchema = new Schema(
   }
 );
 
-const User = models.User || model("User", UserSchema);
+const User = models.User || model<IUser>("User", UserSchema);
 export default User;

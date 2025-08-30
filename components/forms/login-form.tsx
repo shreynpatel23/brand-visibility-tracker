@@ -61,19 +61,20 @@ export function LoginForm() {
         password,
       });
       const { data } = response;
+      const { user } = data;
       try {
         if (typeof window !== "undefined") {
-          localStorage.setItem("userId", data._id);
-          localStorage.setItem("token", data.token);
+          localStorage.setItem("userId", user._id);
+          localStorage.setItem("token", user.token);
         }
       } catch (error) {
         console.error("Error while setting token in localStorage:", error);
       }
-      setUser(data);
-      const url = redirectToCurrentOnboardingStep(
-        data.current_onboarding_step,
-        data
-      );
+      setUser(user);
+      const url = redirectToCurrentOnboardingStep({
+        currentOnboardingStep: data.current_onboarding_step,
+        data: user,
+      });
       router.push(url);
     } catch (error) {
       setError(

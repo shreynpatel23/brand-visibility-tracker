@@ -1,5 +1,5 @@
 import { PlanTypes } from "@/constants/plan-types";
-import { IUser } from "@/context/userContext";
+import { IUser } from "@/lib/models/user";
 
 export function isPaidUser(user: IUser | undefined) {
   return (

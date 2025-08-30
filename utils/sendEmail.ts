@@ -18,7 +18,6 @@ export const sendEmail = async (
       subject,
       html: message,
     };
-
     await sgMail.send(mailOptions);
   } catch (error) {
     return new NextResponse("Error in sending email " + error, { status: 500 });

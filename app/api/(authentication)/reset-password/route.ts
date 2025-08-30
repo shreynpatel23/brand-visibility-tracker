@@ -36,7 +36,7 @@ export async function POST(req: Request) {
         message: "Password reset successfully! Redirecting to login...",
       }),
       {
-        status: 201,
+        status: 200,
       }
     );
   } catch (err) {
