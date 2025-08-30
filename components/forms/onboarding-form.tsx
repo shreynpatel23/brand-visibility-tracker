@@ -27,24 +27,7 @@ import { useState } from "react";
 import { postData } from "@/utils/fetch";
 import ApiError from "../api-error";
 import Loading from "../loading";
-
-const categories = [
-  "Technology",
-  "Healthcare",
-  "Finance",
-  "Retail",
-  "Education",
-  "Entertainment",
-  "Other",
-];
-const regions = [
-  "North America",
-  "Europe",
-  "Asia Pacific",
-  "Latin America",
-  "Middle East & Africa",
-  "Global",
-];
+import { CATEGORIES, REGIONS } from "@/constants/onboarding-constants";
 
 export interface IOnboardingForm {
   _id: string;
@@ -163,7 +146,7 @@ export function OnboardingForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {categories.map((cat) => (
+                      {CATEGORIES.map((cat) => (
                         <SelectItem key={cat} value={cat}>
                           {cat}
                         </SelectItem>
@@ -191,7 +174,7 @@ export function OnboardingForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {regions.map((reg) => (
+                      {REGIONS.map((reg) => (
                         <SelectItem key={reg} value={reg}>
                           {reg}
                         </SelectItem>

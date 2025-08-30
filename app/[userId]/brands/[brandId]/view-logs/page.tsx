@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Loading from "@/components/loading";
-import InviteMemberPage from ".";
+import ViewLogs from ".";
 
 type Params = Promise<{ brandId: string; userId: string }>;
 
@@ -11,7 +11,7 @@ export default async function Page({ params }: { params: Params }) {
   const { brandId, userId } = await params;
   return (
     <Suspense fallback={<SuspenseFallback />}>
-      <InviteMemberPage userId={userId} brandId={brandId} />
+      <ViewLogs userId={userId} brandId={brandId} />
     </Suspense>
   );
 }

@@ -1,17 +1,17 @@
 import { Suspense } from "react";
 import Loading from "@/components/loading";
-import InviteMemberPage from ".";
+import EditBrand from ".";
 
-type Params = Promise<{ brandId: string; userId: string }>;
+type Params = Promise<{ userId: string; brandId: string }>;
 
 function SuspenseFallback() {
   return <Loading message="Loading reset password page..." />;
 }
 export default async function Page({ params }: { params: Params }) {
-  const { brandId, userId } = await params;
+  const { userId, brandId } = await params;
   return (
     <Suspense fallback={<SuspenseFallback />}>
-      <InviteMemberPage userId={userId} brandId={brandId} />
+      <EditBrand userId={userId} brandId={brandId} />
     </Suspense>
   );
 }

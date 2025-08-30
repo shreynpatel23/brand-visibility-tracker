@@ -14,6 +14,6 @@ export function redirectToCurrentOnboardingStep({
     case CREATE_BRAND:
       return `/${data._id}/onboarding`;
     default:
-      return `/${data._id}/brands`;
+      return "";
   }
 }

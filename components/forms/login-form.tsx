@@ -75,7 +75,11 @@ export function LoginForm() {
         currentOnboardingStep: data.current_onboarding_step,
         data: user,
       });
-      router.push(url);
+      if (url === "") {
+        router.push(`/${user._id}/brands`);
+      } else {
+        router.push(url);
+      }
     } catch (error) {
       setError(
         `Login failed - ${
