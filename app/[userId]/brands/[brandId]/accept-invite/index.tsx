@@ -10,8 +10,9 @@ import {
 import { AcceptInviteMemberForm } from "@/components/forms/accept-invite-member-form";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { fetchData } from "@/utils/fetch";
+import { fetchData, postData } from "@/utils/fetch";
 import Logo from "@/components/logo";
+import Loading from "@/components/loading";
 
 interface IInviteData {
   name: string;
@@ -33,6 +34,7 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
   const searchParams = useSearchParams();
   const token = searchParams.get("verifyToken");
   const email = searchParams.get("email");
+  const existingUserId = searchParams.get("user_id");
 
   //   Fetch invite data on component mount
   useEffect(() => {
@@ -130,6 +132,31 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
     );
   }
 
+  async function handleAcceptInvite() {
+    setLoading(true);
+    try {
+      const response = await postData(`/api/brand/${brandId}/accept-invite`, {
+        invitedBy: inviteData?.ownerId._id,
+        verifyToken: token,
+        email,
+      });
+      const { data } = response;
+      const { user } = data;
+      setSuccess(true);
+      setTimeout(() => {
+        router.push(`/${user._id}/brands/${brandId}/dashboard`);
+      }, 5000);
+    } catch (error) {
+      setError(
+        `Accept Invite Failed - ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Main form
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
@@ -182,31 +209,56 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
           </div>
         )}
 
-        {/* Account Creation Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            Create your account
-          </h3>
+        {existingUserId ? (
+          <>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Accept the invite
+              </h3>
+              <Button
+                type="button"
+                variant={loading ? "outline" : "default"}
+                disabled={loading}
+                className="w-full"
+                onClick={handleAcceptInvite}
+              >
+                {loading ? (
+                  <Loading message="Accepting invite..." />
+                ) : (
+                  "Accept Invite"
+                )}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Account Creation Form */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Create your account
+              </h3>
 
-          <AcceptInviteMemberForm
-            invitedBy={inviteData?.ownerId._id!}
-            token={token!}
-            email={email!}
-            brandId={brandId}
-          />
-        </div>
+              <AcceptInviteMemberForm
+                invitedBy={inviteData?.ownerId._id!}
+                token={token!}
+                email={email!}
+                brandId={brandId}
+              />
+            </div>
 
-        <div className="text-center">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            Already have an account?{" "}
-            <button
-              onClick={() => router.push(`/login?email=${email}`)}
-              className="font-medium text-primary hover:text-primary/80"
-            >
-              Sign in instead
-            </button>
-          </span>
-        </div>
+            <div className="text-center">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Already have an account?{" "}
+                <button
+                  onClick={() => router.push(`/login?email=${email}`)}
+                  className="font-medium text-primary hover:text-primary/80"
+                >
+                  Sign in instead
+                </button>
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -5,7 +5,11 @@ import AcceptInvitePage from ".";
 type Params = Promise<{ brandId: string }>;
 
 function SuspenseFallback() {
-  return <Loading message="Loading reset password page..." />;
+  return (
+    <div className="w-screen h-screen flex iems-center justify-center">
+      <Loading message="Loading accept invite page..." />
+    </div>
+  );
 }
 
 export default async function Page({ params }: { params: Params }) {

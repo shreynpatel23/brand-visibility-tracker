@@ -5,7 +5,11 @@ import EditBrand from ".";
 type Params = Promise<{ userId: string; brandId: string }>;
 
 function SuspenseFallback() {
-  return <Loading message="Loading reset password page..." />;
+  return (
+    <div className="w-screen h-screen flex iems-center justify-center">
+      <Loading message="Loading edit brand page..." />
+    </div>
+  );
 }
 export default async function Page({ params }: { params: Params }) {
   const { userId, brandId } = await params;

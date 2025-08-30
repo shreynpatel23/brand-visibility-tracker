@@ -140,6 +140,9 @@ export async function POST(
     const { email: enteredEmail, role: selectedRole } = emailRaw;
     const email = enteredEmail.toLowerCase();
 
+    // check if this email is already registered with us
+    const isUserRegisted = await User.findOne({ email });
+
     // If the email already has an active membership on this brand, skip
     const existingMember = await Membership.findOne({ brand_id: brandId })
       .populate({ path: "user_id", select: "email" })
@@ -185,8 +188,13 @@ export async function POST(
     // Email the invite link
     const verificationToken = await getVerificationToken(newInvite, ttlHours);
     await newInvite.save();
+    let verificationLink = "";
 
-    const verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${user._id}/brands/${brandId}/accept-invite?verifyToken=${verificationToken}&email=${email}`;
+    if (isUserRegisted._id) {
+      verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${user._id}/brands/${brandId}/accept-invite?verifyToken=${verificationToken}&email=${email}&user_id=${isUserRegisted._id}`;
+    } else {
+      verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${user._id}/brands/${brandId}/accept-invite?verifyToken=${verificationToken}&email=${email}`;
+    }
     const message = inviteMemberEmailTemplate(verificationLink);
 
     // Send verification email

@@ -15,10 +15,12 @@ const AcceptInviteBody = z.object({
   invitedBy: z.string(),
   verifyToken: z.string().min(10),
   email: z.string().email(),
-  signup: z.object({
-    full_name: z.string().min(2).max(120),
-    password: z.string().min(6).max(128),
-  }),
+  signup: z
+    .object({
+      full_name: z.string().min(2).max(120),
+      password: z.string().min(6).max(128),
+    })
+    .optional(),
 });
 
 function hashToken(token: string) {
@@ -57,17 +59,11 @@ export async function POST(
   }
 
   const { verifyToken, email, signup, invitedBy } = parse.data;
-
-  const verify_token = crypto
-    .createHash("sha256")
-    .update(verifyToken)
-    .digest("hex");
-
   const now = new Date();
 
   // Find a live, pending invite by hashed token
   const invite = await Invite.findOne({
-    verify_token,
+    verify_token: hashToken(verifyToken),
     brand_id: brandId,
     email: email.toLowerCase(),
     status: "pending",
@@ -116,7 +112,10 @@ export async function POST(
     // if the user does not exist, create one
     if (!existingUser) {
       // encrypt the password using bcrypt
-      const hashedPassword = await bcrypt.hash(signup?.password, 12);
+      if (!signup?.password) {
+        throw new Error("Password is required for signup.");
+      }
+      const hashedPassword = await bcrypt.hash(signup.password, 12);
       // fetch all plans
       const plans = await Plan.find();
 
@@ -133,6 +132,8 @@ export async function POST(
       });
       user = newUser;
       await newUser.save();
+    } else {
+      user = existingUser;
     }
 
     // add in the membership table with role as invite

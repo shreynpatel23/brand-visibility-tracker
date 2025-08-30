@@ -3,7 +3,11 @@ import ResetPassword from ".";
 import Loading from "@/components/loading";
 
 function SuspenseFallback() {
-  return <Loading message="Loading reset password page..." />;
+  return (
+    <div className="w-screen h-screen flex iems-center justify-center">
+      <Loading message="Loading reset password page..." />;
+    </div>
+  );
 }
 export default function Page() {
   return (
