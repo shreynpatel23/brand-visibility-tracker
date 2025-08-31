@@ -20,12 +20,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { IBrand } from "@/lib/models/brand";
 import Link from "next/link";
-import { fetchData } from "@/utils/fetch";
+import { fetchData, deleteData } from "@/utils/fetch";
 import Loading from "@/components/loading";
 import ApiError from "@/components/api-error";
 import Header from "@/components/header";
 import { CATEGORIES } from "@/constants/onboarding-constants";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const BrandList = ({ userId }: { userId: string }) => {
   const router = useRouter();
@@ -35,6 +44,9 @@ const BrandList = ({ userId }: { userId: string }) => {
   const [brands, setBrands] = useState<IBrand[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [brandToDelete, setBrandToDelete] = useState<IBrand | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     async function fetchAllBrandsOfUser() {
@@ -58,6 +70,37 @@ const BrandList = ({ userId }: { userId: string }) => {
       fetchAllBrandsOfUser();
     }
   }, [userId]);
+
+  const handleDeleteBrand = async () => {
+    if (!brandToDelete) return;
+
+    setDeleting(true);
+    try {
+      await deleteData(`/api/brand/${brandToDelete._id}`, {
+        user_id: userId,
+      });
+      toast.success("Brand deleted successfully!");
+      // Remove the deleted brand from the local state
+      setBrands((prevBrands) =>
+        prevBrands.filter((brand) => brand._id !== brandToDelete._id)
+      );
+      setDeleteDialogOpen(false);
+      setBrandToDelete(null);
+    } catch (error) {
+      toast.error(
+        `Error deleting brand - ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const openDeleteDialog = (brand: IBrand) => {
+    setBrandToDelete(brand);
+    setDeleteDialogOpen(true);
+  };
 
   if (loading) {
     return (
@@ -130,7 +173,7 @@ const BrandList = ({ userId }: { userId: string }) => {
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive hover:text-white"
-              onClick={() => console.log("Delete", brand._id)}
+              onClick={() => openDeleteDialog(brand)}
             >
               Delete Brand
             </DropdownMenuItem>
@@ -388,6 +431,40 @@ const BrandList = ({ userId }: { userId: string }) => {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Brand</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{brandToDelete?.name}"? This
+              action cannot be undone and will permanently remove all associated
+              data.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteBrand}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <Loading message="Deleting brand..." />
+              ) : (
+                "Delete Brand"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

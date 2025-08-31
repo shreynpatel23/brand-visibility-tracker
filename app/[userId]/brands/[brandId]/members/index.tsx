@@ -99,7 +99,6 @@ export default function MembersPage({
       // Refresh the members list to get updated data
       fetchMembers();
     } catch (error) {
-      console.error("Error resending invite:", error);
       toast.error(
         `Failed to resend invite to ${member.email}: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -150,7 +149,6 @@ export default function MembersPage({
       setIsDeleteDialogOpen(false);
       setMemberToDelete(null);
     } catch (error) {
-      console.error("Error deleting member:", error);
       toast.error(
         `Failed to remove member: ${
           error instanceof Error ? error.message : "Unknown error"

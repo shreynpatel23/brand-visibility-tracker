@@ -60,7 +60,6 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
         const { data } = response;
         setBrandName(data.name || `Brand ${brandId}`);
       } catch (error) {
-        console.error("Error fetching brand name:", error);
         setBrandName(`Brand ${brandId}`);
       } finally {
         setLoading(false);

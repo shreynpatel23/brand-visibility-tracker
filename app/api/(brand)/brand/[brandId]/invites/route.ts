@@ -246,7 +246,6 @@ export async function POST(
           message: "Invitation email has been sent!",
         });
       } catch (emailErr) {
-        console.error("Failed to send invitation email:", emailErr);
         results.push({
           email,
           status: "error",
@@ -254,7 +253,6 @@ export async function POST(
         });
       }
     } catch (err) {
-      console.error("Error processing invitation for", email, ":", err);
       results.push({
         email,
         status: "error",
@@ -408,7 +406,6 @@ export const PATCH = async (
         { status: 200 }
       );
     } catch (emailError) {
-      console.error("Error sending resend email:", emailError);
       return new NextResponse(
         JSON.stringify({
           message: "Failed to send resend email",

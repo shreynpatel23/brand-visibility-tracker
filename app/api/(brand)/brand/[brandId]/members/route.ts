@@ -152,7 +152,6 @@ export const GET = async (request: Request, context: { params: Params }) => {
       { status: 200 }
     );
   } catch (err) {
-    console.error("Error in fetching brand members:", err);
     return new NextResponse(
       JSON.stringify({
         message: "Error in fetching brand members",
@@ -317,7 +316,6 @@ export const DELETE = async (request: Request, context: { params: Params }) => {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error removing member:", error);
     return new NextResponse(
       JSON.stringify({
         message: "Error removing member",
