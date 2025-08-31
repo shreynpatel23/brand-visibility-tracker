@@ -208,7 +208,7 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex items-center gap-4 px-4 h-20 shrink-0 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-20">
+        <header className="flex items-center gap-4 px-8 h-20 shrink-0 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-20">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1" />
             <div className="h-4 w-px bg-sidebar-border" />
@@ -252,7 +252,7 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
             </Button>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">{children}</div>
+        <div className="flex flex-1 flex-col gap-4 px-8 py-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

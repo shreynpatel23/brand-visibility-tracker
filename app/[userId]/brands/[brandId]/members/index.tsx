@@ -11,6 +11,7 @@ import {
   Shield,
   Trash2,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -25,6 +26,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BrandMember } from "@/types/member";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 export default function MembersPage({
   userId,
@@ -35,6 +44,9 @@ export default function MembersPage({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [resendingInviteId, setResendingInviteId] = useState<string | null>(
     null
@@ -194,6 +206,20 @@ export default function MembersPage({
     return new Date(dateString).toLocaleDateString();
   };
 
+  const filteredUsers = teamMembers.filter((user: BrandMember) => {
+    const matchesSearch =
+      user?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole =
+      roleFilter === "all" ||
+      user.role.toLowerCase() === roleFilter.toLowerCase();
+    const matchesStatus =
+      statusFilter === "all" ||
+      user.status.toLowerCase() === statusFilter.toLowerCase();
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -295,6 +321,47 @@ export default function MembersPage({
         </div>
       )}
 
+      {/* Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="Owner">Owner</SelectItem>
+                <SelectItem value="Admin">Admin</SelectItem>
+                <SelectItem value="Viewer">Viewer</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Suspended">Suspended</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
       {/* Team Members List */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6">
@@ -339,116 +406,130 @@ export default function MembersPage({
                 </tr>
               </thead>
               <tbody>
-                {teamMembers.map((member, index) => {
-                  const isCurrentUser = member.userId === userId;
-                  return (
-                    <tr
-                      key={member.id}
-                      className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                        index % 2 === 0
-                          ? "bg-gray-50/50 dark:bg-gray-800/50"
-                          : ""
-                      }`}
-                    >
-                      <td className="py-4 px-4">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                            {member.email.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="ml-3">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                {member.fullName || member.email}
-                              </p>
-                              {isCurrentUser && (
-                                <Badge variant="secondary">You</Badge>
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((member, index) => {
+                    const isCurrentUser = member.userId === userId;
+                    return (
+                      <tr
+                        key={member.id}
+                        className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                          index % 2 === 0
+                            ? "bg-gray-50/50 dark:bg-gray-800/50"
+                            : ""
+                        }`}
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                              {member.email.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="ml-3">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {member.fullName || member.email}
+                                </p>
+                                {isCurrentUser && (
+                                  <Badge variant="secondary">You</Badge>
+                                )}
+                              </div>
+                              {member.fullName && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {member.email}
+                                </p>
                               )}
                             </div>
-                            {member.fullName && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {member.email}
-                              </p>
-                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
-                            member.role
-                          )}`}
-                        >
-                          <Shield className="w-3 h-3 mr-1" />
-                          {member.role.charAt(0).toUpperCase() +
-                            member.role.slice(1)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                            member.status
-                          )}`}
-                        >
-                          {member.status.charAt(0).toUpperCase() +
-                            member.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {formatDate(
-                            typeof member.invitedAt === "string"
-                              ? member.invitedAt
-                              : member.invitedAt.toString()
-                          )}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {member.lastActive
-                            ? formatDate(
-                                typeof member.lastActive === "string"
-                                  ? member.lastActive
-                                  : member.lastActive.toString()
-                              )
-                            : "Never"}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        {canPerformActions ? (
-                          <div className="flex items-center justify-end gap-2">
-                            {member.status === "pending" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleResendInvite(member)}
-                                disabled={resendingInviteId === member.id}
-                              >
-                                {resendingInviteId === member.id
-                                  ? "Sending..."
-                                  : "Resend"}
-                              </Button>
-                            )}
-                            {/* Don't allow users to remove themselves */}
-                            {!isCurrentUser && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 hover:text-white"
-                                onClick={() => openDeleteDialog(member)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400 dark:text-gray-500">
-                            No actions available
+                        </td>
+                        <td className="py-4 px-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(
+                              member.role
+                            )}`}
+                          >
+                            <Shield className="w-3 h-3 mr-1" />
+                            {member.role.charAt(0).toUpperCase() +
+                              member.role.slice(1)}
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="py-4 px-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+                              member.status
+                            )}`}
+                          >
+                            {member.status.charAt(0).toUpperCase() +
+                              member.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {formatDate(
+                              typeof member.invitedAt === "string"
+                                ? member.invitedAt
+                                : member.invitedAt.toString()
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {member.lastActive
+                              ? formatDate(
+                                  typeof member.lastActive === "string"
+                                    ? member.lastActive
+                                    : member.lastActive.toString()
+                                )
+                              : "Never"}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          {canPerformActions ? (
+                            <div className="flex items-center justify-end gap-2">
+                              {member.status === "pending" &&
+                                member.invitedBy?._id === userId && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleResendInvite(member)}
+                                    disabled={resendingInviteId === member.id}
+                                  >
+                                    {resendingInviteId === member.id
+                                      ? "Sending..."
+                                      : "Resend"}
+                                  </Button>
+                                )}
+                              {/* Don't allow users to remove themselves */}
+                              {!isCurrentUser &&
+                                member.status !== "pending" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-red-600 hover:text-white"
+                                    onClick={() => openDeleteDialog(member)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400 dark:text-gray-500">
+                              No actions available
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="text-center pt-8 pb-4 leading-relaxed"
+                    >
+                      No team members found, <br /> try adjusting your filters
+                      to see more results.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

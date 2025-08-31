@@ -82,6 +82,7 @@ export const GET = async (request: Request, context: { params: Params }) => {
         fullName: user.full_name,
         role: membership.role,
         status: "active" as const,
+        invitedBy: null,
         invitedAt: membership.createdAt,
         createdBy: membership.created_by,
         membershipId: membership._id.toString(),
@@ -99,6 +100,7 @@ export const GET = async (request: Request, context: { params: Params }) => {
         fullName: null, // No full name for pending invites
         role: invite.role,
         status: "pending" as const,
+        invitedBy: invite.invited_by,
         invitedAt: invite.createdAt,
         createdBy: invite.invited_by,
         membershipId: null,
@@ -131,6 +133,7 @@ export const GET = async (request: Request, context: { params: Params }) => {
         fullName: brandOwner.full_name,
         role: "owner" as const,
         status: "active" as const,
+        invitedBy: null,
         invitedAt: brand.createdAt,
         createdBy: null,
         membershipId: null,

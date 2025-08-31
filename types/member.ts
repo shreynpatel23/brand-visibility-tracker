@@ -11,6 +11,11 @@ export interface BrandMember {
     full_name: string;
     email: string;
   } | null;
+  invitedBy?: {
+    _id: string;
+    full_name: string;
+    email: string;
+  } | null;
   membershipId: string | null;
   inviteId: string | null; // new field for invite ID
   lastActive?: Date | string | null; // null for pending invites
