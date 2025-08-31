@@ -1,6 +1,5 @@
 "use client";
 
-import { InviteTeamMemberForm } from "@/components/forms/invite-member-form";
 import {
   IOnboardingForm,
   OnboardingForm,
@@ -87,7 +86,7 @@ export default function OnboardingPage({ userId }: { userId: string }) {
                 userId={userId}
                 setCurrentStep={setCurrentStep}
                 onContinue={(value: IOnboardingForm) =>
-                  router.push(`/${userId}/brands/${value._id}/invite-member`)
+                  router.push(`/${userId}/${value._id}/invite-member`)
                 }
               />
             </div>
