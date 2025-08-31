@@ -53,31 +53,34 @@ function getVerificationToken(invite: IInvite, ttlHours: number): string {
 }
 
 // list pending invites for UI
-// export async function GET(
-//   _req: NextRequest,
-//   { params }: { params: { brandId: string } }
-// ) {
-//   await connect();
-//   const brandId = params.brandId;
-//   const invites = await Invite.find({
-//     brand_id: brandId,
-//     status: "pending",
-//     expires_at: { $gt: new Date() },
-//   })
-//     .select("_id email role expires_at invited_by createdAt")
-//     .lean();
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { brandId: string } }
+) {
+  await connect();
+  const { brandId } = await params;
+  const invites = await Invite.find({
+    brand_id: brandId,
+    status: "pending",
+    verify_token_expire: { $gt: new Date() }, // Only non-expired invites
+  })
+    .select("_id email role verify_token_expire invited_by createdAt")
+    .lean();
 
-//   return NextResponse.json({
-//     data: invites.map((i) => ({
-//       id: String(i._id),
-//       email: i.email,
-//       role: i.role,
-//       expires_at: i.expires_at,
-//       invited_by: i.invited_by,
-//       created_at: i.createdAt,
-//     })),
-//   });
-// }
+  return new NextResponse(
+    JSON.stringify({
+      data: invites.map((i) => ({
+        id: String(i._id),
+        email: i.email,
+        role: i.role,
+        expires_at: i.verify_token_expire,
+        invited_by: i.invited_by,
+        created_at: i.createdAt,
+      })),
+    }),
+    { status: 200 }
+  );
+}
 
 export async function POST(
   request: NextRequest,
@@ -138,78 +141,116 @@ export async function POST(
 
   for (const emailRaw of emails) {
     const { email: enteredEmail, role: selectedRole } = emailRaw;
-    const email = enteredEmail.toLowerCase();
+    const email = enteredEmail.toLowerCase().trim();
 
-    // check if this email is already registered with us
-    const isUserRegisted = await User.findOne({ email });
-
-    // If the email already has an active membership on this brand, skip
-    const existingMember = await Membership.findOne({ brand_id: brandId })
-      .populate({ path: "user_id", select: "email" })
-      .lean();
-
-    if (
-      existingMember &&
-      (existingMember as any)?.user_id?.email?.toLowerCase?.() === email
-    ) {
+    // Skip empty emails
+    if (!email) {
       results.push({
-        email,
-        status: "skipped",
-        message: "User is already a member of this brand",
+        email: enteredEmail,
+        status: "error",
+        message: "Email cannot be empty",
       });
       continue;
     }
 
-    // Prevent duplicate pending invites to same brand/email
-    const existingInvite = await Invite.findOne({
-      brand_id: brandId,
-      email,
-      status: "pending",
-    }).lean();
-
-    if (existingInvite) {
+    // Prevent self-invitation
+    if (email === user.email.toLowerCase()) {
       results.push({
         email,
         status: "skipped",
-        message: "An invite is already pending for this email",
+        message: "You cannot invite yourself",
       });
       continue;
     }
 
-    // Persist invite
-    const newInvite = new Invite({
-      brand_id: brandId,
-      email,
-      role: selectedRole,
-      invited_by: user._id,
-      status: "pending",
-    });
-
-    // Email the invite link
-    const verificationToken = await getVerificationToken(newInvite, ttlHours);
-    await newInvite.save();
-    let verificationLink = "";
-
-    if (isUserRegisted._id) {
-      verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${user._id}/brands/${brandId}/accept-invite?verifyToken=${verificationToken}&email=${email}&user_id=${isUserRegisted._id}`;
-    } else {
-      verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${user._id}/brands/${brandId}/accept-invite?verifyToken=${verificationToken}&email=${email}`;
-    }
-    const message = inviteMemberEmailTemplate(verificationLink);
-
-    // Send verification email
     try {
-      await sendEmail(email, "Brand Invitation Email", message);
-      results.push({
+      // check if this email is already registered with us
+      const isUserRegisted = await User.findOne({ email }).lean();
+
+      // If the email already has an active membership on this brand, skip
+      let existingMember = null;
+      if (isUserRegisted && (isUserRegisted as any)._id) {
+        existingMember = await Membership.findOne({
+          brand_id: brandId,
+          user_id: (isUserRegisted as any)._id,
+          status: "active",
+        }).lean();
+      }
+
+      if (existingMember) {
+        results.push({
+          email,
+          status: "skipped",
+          message: "User is already a member of this brand",
+        });
+        continue;
+      }
+
+      // Prevent duplicate pending invites to same brand/email
+      // Also check if invite is not expired
+      const existingInvite = await Invite.findOne({
+        brand_id: brandId,
         email,
-        status: "invited",
-        message: "Invitation email has been sent!",
+        status: "pending",
+        verify_token_expire: { $gt: new Date() }, // Only consider non-expired invites
+      }).lean();
+
+      if (existingInvite) {
+        results.push({
+          email,
+          status: "skipped",
+          message: "An active invite is already pending for this email",
+        });
+        continue;
+      }
+
+      // Persist invite
+      const newInvite = new Invite({
+        brand_id: brandId,
+        email,
+        role: selectedRole,
+        invited_by: user._id,
+        status: "pending",
       });
+
+      // Email the invite link
+      const verificationToken = getVerificationToken(newInvite, ttlHours);
+      await newInvite.save();
+      let verificationLink = "";
+
+      if (isUserRegisted && (isUserRegisted as any)._id) {
+        verificationLink = `${
+          process.env.NEXT_PUBLIC_BASE_URL
+        }/accept-invite/${brandId}?verifyToken=${verificationToken}&email=${email}&user_id=${
+          (isUserRegisted as any)._id
+        }`;
+      } else {
+        verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/accept-invite/${brandId}?verifyToken=${verificationToken}&email=${email}`;
+      }
+      const message = inviteMemberEmailTemplate(verificationLink);
+
+      // Send verification email
+      try {
+        await sendEmail(email, "Brand Invitation Email", message);
+        results.push({
+          email,
+          status: "invited",
+          message: "Invitation email has been sent!",
+        });
+      } catch (emailErr) {
+        console.error("Failed to send invitation email:", emailErr);
+        results.push({
+          email,
+          status: "error",
+          message: "Failed to send invitation email.",
+        });
+      }
     } catch (err) {
+      console.error("Error processing invitation for", email, ":", err);
       results.push({
         email,
         status: "error",
-        message: "Failed to send invitation email.",
+        message: "An error occurred while processing this invitation.",
       });
     }
   }

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Loading from "@/components/loading";
-import AcceptInvitePage from ".";
+import AcceptInvitePage from "./index";
 
 type Params = Promise<{ brandId: string }>;
 

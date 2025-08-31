@@ -1,12 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import {
-  Building2,
-  Users,
-  CheckCircle,
-  AlertCircle,
-  Loader,
-} from "lucide-react";
+import { Users, CheckCircle, AlertCircle, Loader } from "lucide-react";
 import { AcceptInviteMemberForm } from "@/components/forms/accept-invite-member-form";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -18,6 +12,11 @@ interface IInviteData {
   name: string;
   category: string;
   ownerId: {
+    _id: string;
+    full_name: string;
+    email: string;
+  };
+  invitedBy: {
     _id: string;
     full_name: string;
     email: string;
@@ -46,7 +45,9 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
       }
 
       try {
-        const response = await fetchData(`/api/brand/${brandId}`);
+        const response = await fetchData(
+          `/api/brand/${brandId}?email=${encodeURIComponent(email)}`
+        );
         const { data } = response;
         setInviteData(data);
       } catch (error) {
@@ -57,7 +58,7 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
     };
 
     fetchInviteData();
-  }, [token, email]);
+  }, [token, email, brandId]);
 
   // Loading state
   if (inviteLoading) {
@@ -66,15 +67,15 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                <Loader className="h-8 w-8 text-blue-600 dark:text-blue-400 animate-spin" />
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <Loader className="h-8 w-8 text-primary animate-spin" />
               </div>
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-              Loading invitation...
+              Loading Invitation
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Please wait while we verify your invitation.
+              Please wait while we verify your invitation...
             </p>
           </div>
         </div>
@@ -94,12 +95,15 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
               </div>
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-              Welcome to the team!
+              Welcome to the Team!
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Your account has been created and you've joined {inviteData?.name}
-              . Redirecting to dashboard...
+              Your invitation has been accepted successfully. You will be
+              redirected to the dashboard shortly.
             </p>
+            <div className="mt-4">
+              <Loader className="h-5 w-5 text-primary animate-spin mx-auto" />
+            </div>
           </div>
         </div>
       </div>
@@ -136,7 +140,7 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
     setLoading(true);
     try {
       const response = await postData(`/api/brand/${brandId}/accept-invite`, {
-        invitedBy: inviteData?.ownerId._id,
+        invitedBy: inviteData?.invitedBy._id,
         verifyToken: token,
         email,
       });
@@ -159,8 +163,9 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
 
   // Main form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full mx-auto space-y-8">
+        {/* Header */}
         <div className="text-center">
           <div className="flex justify-center">
             <Logo />
@@ -169,7 +174,7 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
             Join the team
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            You've been invited to collaborate on brand tracking
+            You&apos;ve been invited to collaborate on brand tracking
           </p>
         </div>
 
@@ -196,13 +201,13 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
                   Invited by:
                 </span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  {inviteData.ownerId.full_name}
+                  {inviteData.invitedBy.full_name}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Email:</span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  {inviteData.ownerId.email}
+                  {inviteData.invitedBy.email}
                 </span>
               </div>
             </div>
@@ -213,14 +218,17 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
           <>
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                Accept the invite
+                Accept Invitation
               </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                Click the button below to join the team and start collaborating.
+              </p>
+
               <Button
-                type="button"
-                variant={loading ? "outline" : "default"}
+                onClick={handleAcceptInvite}
                 disabled={loading}
                 className="w-full"
-                onClick={handleAcceptInvite}
+                variant={loading ? "outline" : "default"}
               >
                 {loading ? (
                   <Loading message="Accepting invite..." />
@@ -239,9 +247,9 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
               </h3>
 
               <AcceptInviteMemberForm
-                invitedBy={inviteData?.ownerId._id!}
-                token={token!}
-                email={email!}
+                invitedBy={inviteData?.invitedBy._id || ""}
+                token={token || ""}
+                email={email || ""}
                 brandId={brandId}
               />
             </div>

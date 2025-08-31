@@ -10,6 +10,8 @@ type Params = Promise<{ brandId: string }>;
 export const GET = async (request: Request, context: { params: Params }) => {
   try {
     const { brandId } = await context.params;
+    const url = new URL(request.url);
+    const email = url.searchParams.get("email");
 
     // check if the brandId exist and is valid
     if (!brandId || !Types.ObjectId.isValid(brandId)) {
@@ -40,10 +42,34 @@ export const GET = async (request: Request, context: { params: Params }) => {
       );
     }
 
+    // If email is provided, fetch the invite details to get the invited_by user
+    let invitedByUser = null;
+    if (email) {
+      const { Invite } = await import("@/lib/models/invite");
+
+      const invite = await Invite.findOne({
+        brand_id: brandId,
+        email: email.toLowerCase(),
+        status: "pending",
+      }).populate({
+        path: "invited_by",
+        select: ["_id", "full_name", "email"],
+      });
+
+      if (invite && invite.invited_by) {
+        invitedByUser = invite.invited_by;
+      }
+    }
+
+    const responseData = {
+      ...brand.toObject(),
+      invitedBy: invitedByUser || brand.ownerId, // Use invited_by if available, fallback to owner
+    };
+
     return new NextResponse(
       JSON.stringify({
         message: "Brand Details fetched successfully!",
-        data: brand,
+        data: responseData,
       }),
       { status: 200 }
     );
