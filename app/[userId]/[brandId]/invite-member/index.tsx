@@ -1,14 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import ApiError from "@/components/api-error";
 import { InviteTeamMemberForm } from "@/components/forms/invite-member-form";
-import { IOnboardingForm } from "@/components/forms/onboarding-form";
-import Loading from "@/components/loading";
 import Logo from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
-import { fetchData } from "@/utils/fetch";
 import { Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function InviteMemberPage({
   userId,
@@ -17,43 +16,9 @@ export default function InviteMemberPage({
   userId: string;
   brandId: string;
 }) {
+  const router = useRouter();
   const [currentStep] = useState(2);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<IOnboardingForm | undefined>(
-    undefined
-  );
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    async function fetchBrand() {
-      try {
-        const response = await fetchData(`/api/brand/${brandId}`);
-        const { data } = response;
-        setFormData(data);
-      } catch (error) {
-        setError(
-          `Error in creating brand - ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (brandId && userId) {
-      setLoading(true);
-      fetchBrand();
-    }
-  }, [userId, brandId]);
-
-  if (loading) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center">
-        <Loading message="Fetching brand details..." />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
@@ -133,7 +98,39 @@ export default function InviteMemberPage({
                   setMessage={(value) => setError(value)}
                 />
               )}
-              <InviteTeamMemberForm userId={userId} formData={formData} />
+              <InviteTeamMemberForm
+                userId={userId}
+                brandId={brandId}
+                showSkip
+                onSuccess={(data) => {
+                  // Separate successful and failed invites
+                  const successfulInvites = data.filter(
+                    (invite) => invite.status === "invited"
+                  );
+                  const failedInvites = data.filter(
+                    (invite) => invite.status !== "invited"
+                  );
+
+                  // Show success toast for successful invites
+                  if (successfulInvites.length > 0) {
+                    const successMessage =
+                      successfulInvites.length === 1
+                        ? `Successfully invited ${successfulInvites[0].email}`
+                        : `Successfully invited ${successfulInvites.length} members`;
+                    toast.success(successMessage);
+                  }
+
+                  // Show error toast for failed invites
+                  if (failedInvites.length > 0) {
+                    const errorMessage =
+                      failedInvites.length === 1
+                        ? `Failed to invite ${failedInvites[0].email}: ${failedInvites[0].message}`
+                        : `Failed to invite ${failedInvites.length} members. Check console for details.`;
+                    toast.error(errorMessage);
+                  }
+                  router.push(`/${userId}/brands`);
+                }}
+              />
             </div>
           )}
         </div>

@@ -123,13 +123,13 @@ const BrandList = ({ userId }: { userId: string }) => {
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() =>
-                router.push(`/${userId}/brands/${brand._id}/dashboard`)
+                router.push(`/${userId}/brands/${brand._id}/matrix`)
               }
             >
               View Metrics
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              className="text-destructive hover:text-white"
               onClick={() => console.log("Delete", brand._id)}
             >
               Delete Brand

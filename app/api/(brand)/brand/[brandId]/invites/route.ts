@@ -9,6 +9,7 @@ import User from "@/lib/models/user";
 import { IInvite, Invite } from "@/lib/models/invite";
 import { inviteMemberEmailTemplate } from "@/utils/inviteMemberEmailTempelate";
 import { sendEmail } from "@/utils/sendEmail";
+import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 
 // Update: email is now an array of strings
 const MultiInviteBody = z.object({
@@ -98,8 +99,14 @@ export async function POST(
     );
   }
 
+  const { user_id, emails } = parse.data;
+  const ttlHours = parse.data.ttl_hours ?? 24 * 7; // 7 days
+
   // extract the brandId from params
   const { brandId } = await params;
+
+  // connect to the database
+  await connect();
 
   // verify brand exists
   const brand = await Brand.findById(brandId).lean();
@@ -109,13 +116,6 @@ export async function POST(
       { status: 400 }
     );
   }
-
-  const { user_id, emails } = parse.data;
-  const ttlHours = parse.data.ttl_hours ?? 24 * 7; // 7 days
-
-  // connect to the database
-  await connect();
-
   // fetch the user details
   const user = await User.findById(user_id);
   if (!user) {
@@ -264,3 +264,159 @@ export async function POST(
     }
   );
 }
+
+// Resend invite schema
+const ResendInviteBody = z.object({
+  inviteId: ObjectIdString,
+  user_id: ObjectIdString, // User requesting the resend
+  ttl_hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 14)
+    .optional()
+    .default(24), // Default to 24 hours
+});
+
+type Params = Promise<{ brandId: string }>;
+
+// PATCH - Resend invite
+export const PATCH = async (
+  request: NextRequest,
+  context: { params: Params }
+) => {
+  try {
+    // Authenticate the request
+    const authResult = await authMiddleware(request);
+    if (!authResult.isValid) {
+      return new NextResponse(
+        JSON.stringify({ message: "Unauthorized access!" }),
+        { status: 401 }
+      );
+    }
+
+    // Validate request body
+    const parse = ResendInviteBody.safeParse(await request.json());
+    if (!parse.success) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Invalid request body!",
+          data: `${parse.error.issues[0]?.path} - ${parse.error.issues[0]?.message}`,
+        }),
+        { status: 400 }
+      );
+    }
+    const { inviteId, user_id } = parse.data;
+    const ttlHours = parse.data.ttl_hours ?? 24 * 7; // 7 days
+
+    // extract the brandId from params
+    const { brandId } = await context.params;
+
+    // Connect to database
+    await connect();
+
+    // Verify brand exists
+    const brand = await Brand.findById(brandId);
+    if (!brand) {
+      return new NextResponse(JSON.stringify({ message: "Brand not found!" }), {
+        status: 404,
+      });
+    }
+
+    // fetch the user details
+    const user = await User.findById(user_id);
+    if (!user) {
+      return new NextResponse(
+        JSON.stringify({ message: "User does not exist!" }),
+        { status: 400 }
+      );
+    }
+
+    // Authorization: inviter must be owner/admin on this brand
+    const invitor = await assertOwnerOrAdmin(user._id, brandId);
+    if (!invitor || !["owner", "admin"].includes(invitor.role)) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "You do not have permission to invite users to this brand.",
+        }),
+        { status: 403 }
+      );
+    }
+
+    // Find the invite
+    const invite = await Invite.findOne({
+      _id: inviteId,
+      brand_id: brandId,
+      status: "pending",
+    });
+
+    if (!invite) {
+      return new NextResponse(
+        JSON.stringify({ message: "Invite not found or already processed!" }),
+        { status: 404 }
+      );
+    }
+
+    // Generate new verification token
+    const verificationToken = getVerificationToken(invite, ttlHours);
+
+    // Save the updated invite
+    await invite.save();
+
+    // Check if the user is already registered with us
+    const isUserRegistered = await User.findOne({ email: invite.email }).lean();
+
+    // Create verification link based on user registration status
+    let verificationLink: string;
+    if (isUserRegistered && (isUserRegistered as any)._id) {
+      // User is registered - include user_id in the link
+      verificationLink = `${
+        process.env.NEXT_PUBLIC_BASE_URL
+      }/accept-invite/${brandId}?verifyToken=${verificationToken}&email=${
+        invite.email
+      }&user_id=${(isUserRegistered as any)._id}`;
+    } else {
+      // User is not registered - they'll need to create an account first
+      verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/accept-invite/${brandId}?verifyToken=${verificationToken}&email=${invite.email}`;
+    }
+
+    // Prepare email content
+    const message = inviteMemberEmailTemplate(verificationLink);
+
+    // Send email
+    try {
+      await sendEmail(invite.email, "Brand Invitation Email (Resent)", message);
+
+      return new NextResponse(
+        JSON.stringify({
+          message: "Invite resent successfully!",
+          data: {
+            email: invite.email,
+            status: "resent",
+            expiresAt: invite.verify_token_expire,
+            isUserRegistered: !!isUserRegistered,
+          },
+        }),
+        { status: 200 }
+      );
+    } catch (emailError) {
+      console.error("Error sending resend email:", emailError);
+      return new NextResponse(
+        JSON.stringify({
+          message: "Failed to send resend email",
+          error:
+            emailError instanceof Error ? emailError.message : "Unknown error",
+        }),
+        { status: 500 }
+      );
+    }
+  } catch (error) {
+    return new NextResponse(
+      JSON.stringify({
+        message: "Error in resending invite",
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      { status: 500 }
+    );
+  }
+};

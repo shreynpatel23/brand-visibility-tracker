@@ -1,10 +1,13 @@
 import axios from "axios";
 
 export async function fetchData(url: string) {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : "";
   try {
     const response = await axios.get(url, {
       headers: {
         "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
       },
     });
 
@@ -40,6 +43,25 @@ export async function putData(url: string, body: any) {
     typeof window !== "undefined" ? localStorage.getItem("token") : "";
   try {
     const response = await axios.put(url, body, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token,
+      },
+    });
+
+    const { data } = response;
+    return data;
+  } catch (err: any) {
+    const { data } = err.response;
+    throw new Error(data?.message || "Error in making API Call");
+  }
+}
+
+export async function patchData(url: string, body: any) {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("token") : "";
+  try {
+    const response = await axios.patch(url, body, {
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + token,

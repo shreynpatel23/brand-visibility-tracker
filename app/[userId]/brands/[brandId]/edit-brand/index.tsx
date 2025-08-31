@@ -99,13 +99,6 @@ export default function EditBrand({
     }
   };
 
-  const removeKeyword = (keyword: string) => {
-    setBrandData((prev) => ({
-      ...prev,
-      keywords: prev.keywords.filter((k) => k !== keyword),
-    }));
-  };
-
   const handleSave = async () => {
     setSaving(true);
     setError("");
@@ -291,102 +284,6 @@ export default function EditBrand({
         </div>
       </div>
 
-      {/* Keywords Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-              <Tag className="w-5 h-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Keywords
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Add keywords to help track brand mentions
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                onKeyPress={handleKeywordKeyPress}
-                className="flex-1 px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Add a keyword..."
-              />
-              <Button onClick={addKeyword} disabled={!newKeyword.trim()}>
-                Add
-              </Button>
-            </div>
-
-            {brandData.keywords.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {brandData.keywords.map((keyword, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                  >
-                    {keyword}
-                    <button
-                      onClick={() => removeKeyword(keyword)}
-                      className="ml-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Brand Appearance */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-              <Palette className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Brand Appearance
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Customize how your brand appears in the dashboard
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Brand Color
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={brandData.color}
-                  onChange={(e) => handleInputChange("color", e.target.value)}
-                  className="w-12 h-10 border border-input rounded-md cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={brandData.color}
-                  onChange={(e) => handleInputChange("color", e.target.value)}
-                  className="flex-1 px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="#3B82F6"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Danger Zone */}
       <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
         <div className="p-6">
@@ -405,7 +302,7 @@ export default function EditBrand({
           </div>
           <Button
             variant="outline"
-            className="text-red-600 border-red-300 hover:bg-red-50"
+            className="text-red-600 border-red-300 hover:bg-red-50 hover:text-red-600"
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Delete Brand

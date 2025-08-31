@@ -136,6 +136,23 @@ export async function POST(
       user = existingUser;
     }
 
+    // Check if membership already exists to prevent duplicates
+    const existingMembership = await Membership.findOne({
+      brand_id: brand._id,
+      user_id: user._id,
+      status: "active",
+    });
+
+    if (existingMembership) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "User is already a member of this brand.",
+          data: { user },
+        }),
+        { status: 409 }
+      );
+    }
+
     // add in the membership table with role as invite
     const membership = new Membership({
       brand_id: brand._id,
@@ -145,8 +162,9 @@ export async function POST(
       created_by: invitedBy,
     });
 
+    // Update the specific invite that was used
     const updatedInvite = await Invite.findOneAndUpdate(
-      { brand_id: brandId, email: email.toLowerCase() },
+      { _id: invite._id },
       {
         status: "accepted",
         accepted_at: new Date(),
@@ -155,6 +173,21 @@ export async function POST(
       },
       {
         new: true,
+      }
+    );
+
+    // Also update any other pending invites for the same email/brand to prevent duplicates
+    await Invite.updateMany(
+      {
+        brand_id: brandId,
+        email: email.toLowerCase(),
+        status: "pending",
+        _id: { $ne: invite._id }, // Don't update the one we just updated
+      },
+      {
+        status: "expired",
+        verify_token: undefined,
+        verify_token_expire: undefined,
       }
     );
 

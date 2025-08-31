@@ -1,20 +1,32 @@
 "use client";
 
-import { ArrowLeft, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
-import { IOnboardingForm } from "./onboarding-form";
 import { useRouter } from "next/navigation";
 import { Button } from "../ui/button";
 import { postData } from "@/utils/fetch";
 import ApiError from "../api-error";
 import Loading from "../loading";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function InviteTeamMemberForm({
   userId,
-  formData,
+  brandId,
+  showSkip = false,
+  onSuccess,
 }: {
   userId: string;
-  formData: IOnboardingForm | undefined;
+  brandId: string;
+  showSkip?: boolean;
+  onSuccess: (
+    data: { email: string; status: string; message: string }[]
+  ) => void;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -42,7 +54,7 @@ export function InviteTeamMemberForm({
   const handleComplete = async () => {
     setLoading(true);
     try {
-      const response = await postData(`/api/brand/${formData?._id}/invites`, {
+      const response = await postData(`/api/brand/${brandId}/invites`, {
         emails: teamMembers.map((member) => ({
           email: member.email.toLowerCase(),
           role: member.role.toLowerCase(),
@@ -50,11 +62,7 @@ export function InviteTeamMemberForm({
         user_id: userId,
       });
       const { data } = response;
-      if (data[0]?.status === "invited") {
-        router.push(`/${userId}/brands`);
-      } else {
-        setError(data[0]?.message);
-      }
+      onSuccess(data);
     } catch (error) {
       setError(
         `invite memeber failed - ${
@@ -81,17 +89,21 @@ export function InviteTeamMemberForm({
               placeholder="team@example.com"
               className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             />
-            <select
+            <Select
               value={member.role}
-              onChange={(e) => updateTeamMember(index, "role", e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              onValueChange={(value) => updateTeamMember(index, "role", value)}
             >
-              {roles.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-fit">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role} value={role}>
+                    {role}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {teamMembers.length > 1 && (
               <button
                 type="button"
@@ -118,22 +130,26 @@ export function InviteTeamMemberForm({
       )}
 
       <div className="flex justify-between mt-8">
-        <Button
-          variant={"outline"}
-          onClick={() => router.push(`/${userId}/brands`)}
-        >
-          Skip for now
-        </Button>
+        {showSkip && (
+          <Button
+            variant={"outline"}
+            onClick={() => router.push(`/${userId}/brands`)}
+          >
+            Skip for now
+          </Button>
+        )}
         <div className="ml-auto">
           <Button
-            disabled={loading || !formData?._id}
+            disabled={loading || !brandId}
             variant={loading ? "outline" : "default"}
             onClick={handleComplete}
           >
             {loading ? (
               <Loading message="Inviting members..." />
+            ) : teamMembers.length > 1 ? (
+              "Invite Members"
             ) : (
-              "Go to Dashboard"
+              "Invite Member"
             )}
           </Button>
         </div>
