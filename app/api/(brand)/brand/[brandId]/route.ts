@@ -3,12 +3,21 @@ import connect from "@/lib/db";
 import { Types } from "mongoose";
 import Plan from "@/lib/models/plan";
 import Brand from "@/lib/models/brand";
+import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 
 type Params = Promise<{ brandId: string }>;
 
 // get brand details api
 export const GET = async (request: Request, context: { params: Params }) => {
   try {
+    // Authenticate the request
+    const authResult = await authMiddleware(request);
+    if (!authResult.isValid) {
+      return new NextResponse(
+        JSON.stringify({ message: "Unauthorized access!" }),
+        { status: 401 }
+      );
+    }
     const { brandId } = await context.params;
     const url = new URL(request.url);
     const email = url.searchParams.get("email");

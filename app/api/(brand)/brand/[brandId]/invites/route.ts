@@ -87,6 +87,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { brandId: string } }
 ) {
+  // Authenticate the request
+  const authResult = await authMiddleware(request);
+  if (!authResult.isValid) {
+    return new NextResponse(
+      JSON.stringify({ message: "Unauthorized access!" }),
+      { status: 401 }
+    );
+  }
   // Parse and validate the request body
   const parse = MultiInviteBody.safeParse(await request.json());
   if (!parse.success) {

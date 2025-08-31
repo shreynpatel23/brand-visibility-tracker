@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connect from "@/lib/db";
 import Plan from "@/lib/models/plan";
 import { Types } from "mongoose";
+import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 
 export const GET = async () => {
   try {
@@ -23,6 +24,14 @@ export const GET = async () => {
 
 export const POST = async (request: Request) => {
   try {
+    // Authenticate the request
+    const authResult = await authMiddleware(request);
+    if (!authResult.isValid) {
+      return new NextResponse(
+        JSON.stringify({ message: "Unauthorized access!" }),
+        { status: 401 }
+      );
+    }
     const {
       planId,
       name,
@@ -63,6 +72,14 @@ export const POST = async (request: Request) => {
 
 export const PUT = async (request: Request) => {
   try {
+    // Authenticate the request
+    const authResult = await authMiddleware(request);
+    if (!authResult.isValid) {
+      return new NextResponse(
+        JSON.stringify({ message: "Unauthorized access!" }),
+        { status: 401 }
+      );
+    }
     // extract the fields from the request object
     const { _id, data } = await request.json();
 

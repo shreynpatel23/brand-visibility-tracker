@@ -7,6 +7,7 @@ import Brand from "@/lib/models/brand";
 import { Membership } from "@/lib/models/membership";
 import { ObjectIdString, RoleSchema, StatusSchema } from "@/utils/mongoose";
 import { BrandSummary } from "../../(authentication)/login/route";
+import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 
 const GetAllBrandsOfUser = z.object({
   user_id: ObjectIdString,
@@ -33,6 +34,14 @@ const MembershipInput = z.object({
 
 // get api to get all the brands of the user owned or as a member
 export async function GET(request: NextRequest) {
+  // Authenticate the request
+  const authResult = await authMiddleware(request);
+  if (!authResult.isValid) {
+    return new NextResponse(
+      JSON.stringify({ message: "Unauthorized access!" }),
+      { status: 401 }
+    );
+  }
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("user_id");
 
@@ -125,7 +134,16 @@ export async function GET(request: NextRequest) {
   );
 }
 
+// create brand api
 export async function POST(request: NextRequest) {
+  // Authenticate the request
+  const authResult = await authMiddleware(request);
+  if (!authResult.isValid) {
+    return new NextResponse(
+      JSON.stringify({ message: "Unauthorized access!" }),
+      { status: 401 }
+    );
+  }
   // Parse and validate the request body
   const parse = CreateBrandBody.safeParse(await request.json());
   if (!parse.success) {
