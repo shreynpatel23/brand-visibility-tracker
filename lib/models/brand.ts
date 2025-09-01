@@ -1,19 +1,5 @@
 import { Schema, Types, model, models } from "mongoose";
-
-export interface IBrand {
-  _id: Types.ObjectId;
-  ownerId: Types.ObjectId;
-  name: string;
-  category?: string;
-  region?: string;
-  target_audience?: string[];
-  competitors?: string[];
-  use_case?: string;
-  feature_list?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt?: Date | null;
-}
+import { IBrand } from "@/types/brand";
 
 const BrandSchema = new Schema<IBrand>(
   {

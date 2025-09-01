@@ -4,19 +4,14 @@ import User from "@/lib/models/user";
 import { Types } from "mongoose";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 
-type Params = Promise<{ userId: string }>;
+import { RouteParams, UserParams } from "@/types/api";
 
 // get user details api
-export const GET = async (request: Request, context: { params: Params }) => {
+export const GET = async (
+  request: Request,
+  context: { params: RouteParams<UserParams> }
+) => {
   try {
-    // Authenticate the request
-    const authResult = await authMiddleware(request);
-    if (!authResult.isValid) {
-      return new NextResponse(
-        JSON.stringify({ message: "Unauthorized access!" }),
-        { status: 401 }
-      );
-    }
     const { userId } = await context.params;
 
     // check if the userId exist and is valid
@@ -55,7 +50,10 @@ export const GET = async (request: Request, context: { params: Params }) => {
 };
 
 // update user api
-export const PUT = async (request: Request, context: { params: Params }) => {
+export const PUT = async (
+  request: Request,
+  context: { params: RouteParams<UserParams> }
+) => {
   try {
     // Authenticate the request
     const authResult = await authMiddleware(request);

@@ -1,6 +1,7 @@
 import connect from "@/lib/db";
 import crypto from "crypto";
-import User, { IUser } from "@/lib/models/user";
+import User from "@/lib/models/user";
+import { IUser } from "@/types/auth";
 import { NextResponse } from "next/server";
 import { verificationEmailTemplate } from "@/utils/verificationEmailTempelate";
 import { sendEmail } from "@/utils/sendEmail";

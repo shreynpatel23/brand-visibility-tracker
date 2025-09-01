@@ -6,7 +6,7 @@ import Brand from "@/lib/models/brand";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 import { z } from "zod";
 
-type Params = Promise<{ brandId: string }>;
+import { RouteParams, BrandParams } from "@/types/api";
 
 const UpdateBrandBody = z.object({
   user_id: z.string().min(1, "User ID is required"),
@@ -24,7 +24,10 @@ const DeleteBrandBody = z.object({
 });
 
 // get brand details api
-export const GET = async (request: Request, context: { params: Params }) => {
+export const GET = async (
+  request: Request,
+  context: { params: RouteParams<BrandParams> }
+) => {
   try {
     const { brandId } = await context.params;
     const url = new URL(request.url);
@@ -98,7 +101,10 @@ export const GET = async (request: Request, context: { params: Params }) => {
 };
 
 // update brand details api
-export const PUT = async (request: Request, context: { params: Params }) => {
+export const PUT = async (
+  request: Request,
+  context: { params: RouteParams<BrandParams> }
+) => {
   try {
     // Authenticate the request
     const authResult = await authMiddleware(request);
@@ -153,7 +159,7 @@ export const PUT = async (request: Request, context: { params: Params }) => {
     const { user_id } = parse.data;
 
     // TODO: Add permission check here - for now, only owner can update
-    // In future, you might want to check membership role as well
+    // In future, we might want to check membership role as well
     if (existingBrand.ownerId.toString() !== user_id) {
       return new NextResponse(
         JSON.stringify({ message: "You are not the owner of the brand!" }),
@@ -199,7 +205,10 @@ export const PUT = async (request: Request, context: { params: Params }) => {
 };
 
 // delete brand api
-export const DELETE = async (request: Request, context: { params: Params }) => {
+export const DELETE = async (
+  request: Request,
+  context: { params: RouteParams<BrandParams> }
+) => {
   try {
     // Authenticate the request
     const authResult = await authMiddleware(request);

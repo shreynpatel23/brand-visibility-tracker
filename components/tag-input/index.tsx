@@ -4,12 +4,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface TagInputProps {
-  value: string[];
-  onChange: (value: string[]) => void;
-  placeholder?: string;
-}
+import { TagInputProps } from "@/types/ui";
 
 export function TagInput({ value, onChange, placeholder }: TagInputProps) {
   const [inputValue, setInputValue] = useState("");

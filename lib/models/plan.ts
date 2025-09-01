@@ -1,6 +1,7 @@
 import { Schema, model, models } from "mongoose";
+import { IPlan } from "@/types/plans";
 
-const PlanSchema = new Schema(
+const PlanSchema = new Schema<IPlan>(
   {
     plan_id: {
       type: String,

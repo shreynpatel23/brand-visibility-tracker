@@ -6,18 +6,7 @@ import User from "@/lib/models/user";
 import { cookies } from "next/headers";
 import { Membership } from "@/lib/models/membership";
 import Brand from "@/lib/models/brand";
-
-export type BrandSummary = {
-  _id: string;
-  name?: string;
-  category?: string;
-  region?: string;
-  target_audience?: string[];
-  competitors?: string[];
-  use_case?: string;
-  feature_list?: string[];
-  role?: "owner" | "admin" | "viewer";
-};
+import { BrandSummary } from "@/types/auth";
 
 export const POST = async (request: Request) => {
   try {

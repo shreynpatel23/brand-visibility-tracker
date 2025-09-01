@@ -1,17 +1,5 @@
 import { Schema, Types, model, models } from "mongoose";
-export type Role = "owner" | "admin" | "viewer";
-export type Status = "active" | "suspended";
-
-export interface IMembership {
-  _id: Types.ObjectId;
-  brand_id: Types.ObjectId;
-  user_id: Types.ObjectId;
-  role: Role;
-  status: "active" | "suspended";
-  created_by?: Types.ObjectId;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { IMembership } from "@/types/membership";
 
 const MembershipSchema = new Schema<IMembership>(
   {

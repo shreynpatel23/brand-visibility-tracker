@@ -19,45 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-
-interface Brand {
-  id: string;
-  name: string;
-  category: string;
-  region: string;
-  scores: {
-    TOFU: number;
-    MOFU: number;
-    BOFU: number;
-    EVFU: number;
-  };
-  sentiment: {
-    trend: "up" | "down" | "neutral";
-    percentage: number;
-    distribution: {
-      positive: number;
-      neutral: number;
-      negative: number;
-      stronglyPositive: number;
-    };
-  };
-  metrics: {
-    totalPrompts: number;
-    avgResponseTime: number;
-    successRate: number;
-    lastUpdated: string;
-  };
-  weeklyData: {
-    labels: string[];
-    scores: number[];
-    prompts: number[];
-  };
-  modelPerformance: {
-    ChatGPT: { score: number; prompts: number };
-    Claude: { score: number; prompts: number };
-    Gemini: { score: number; prompts: number };
-  };
-}
+import { DashboardBrand } from "@/types/brand";
 
 const DashboardPage: React.FC = () => {
   const [selectedBrandId, setSelectedBrandId] = useState("1");
@@ -66,7 +28,7 @@ const DashboardPage: React.FC = () => {
   const [dateRange, setDateRange] = useState("7days");
 
   // Mock data
-  const brands: Brand[] = [
+  const brands: DashboardBrand[] = [
     {
       id: "1",
       name: "TechCorp",
@@ -252,7 +214,9 @@ const DashboardPage: React.FC = () => {
     </div>
   );
 
-  const FunnelChart: React.FC<{ scores: Brand["scores"] }> = ({ scores }) => {
+  const FunnelChart: React.FC<{ scores: DashboardBrand["scores"] }> = ({
+    scores,
+  }) => {
     const stages = ["TOFU", "MOFU", "BOFU", "EVFU"] as const;
 
     return (
@@ -290,9 +254,9 @@ const DashboardPage: React.FC = () => {
     );
   };
 
-  const SentimentAnalysis: React.FC<{ sentiment: Brand["sentiment"] }> = ({
-    sentiment,
-  }) => (
+  const SentimentAnalysis: React.FC<{
+    sentiment: DashboardBrand["sentiment"];
+  }> = ({ sentiment }) => (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -361,45 +325,49 @@ const DashboardPage: React.FC = () => {
   );
 
   const ModelPerformance: React.FC<{
-    performance: Brand["modelPerformance"];
+    performance: DashboardBrand["modelPerformance"];
   }> = ({ performance }) => (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
         AI Model Performance
       </h3>
       <div className="space-y-4">
-        {Object.entries(performance).map(([model, data]) => (
-          <div
-            key={model}
-            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
-          >
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
-                <Activity className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-white">
-                  {model}
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {data.prompts} prompts
-                </div>
-              </div>
-            </div>
+        {Object.entries(performance).map(
+          ([model, data]: [string, { score: number; prompts: number }]) => (
             <div
-              className={`text-lg font-semibold ${getScoreTextColor(
-                data.score
-              )}`}
+              key={model}
+              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
             >
-              {data.score}%
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
+                  <Activity className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {model}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {data.prompts} prompts
+                  </div>
+                </div>
+              </div>
+              <div
+                className={`text-lg font-semibold ${getScoreTextColor(
+                  data.score
+                )}`}
+              >
+                {data.score}%
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        )}
       </div>
     </div>
   );
 
-  const WeeklyTrend: React.FC<{ data: Brand["weeklyData"] }> = ({ data }) => (
+  const WeeklyTrend: React.FC<{ data: DashboardBrand["weeklyData"] }> = ({
+    data,
+  }) => (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
         Weekly Performance Trend
@@ -409,7 +377,7 @@ const DashboardPage: React.FC = () => {
           <span>Score Trend</span>
           <span>Prompt Volume</span>
         </div>
-        {data.labels.map((label, index) => (
+        {data.labels.map((label: string, index: number) => (
           <div key={label} className="flex items-center justify-between">
             <div className="w-12 text-sm font-medium text-gray-600 dark:text-gray-400">
               {label}

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Loading from "@/components/loading";
 import CreateBrand from ".";
 
-type Params = Promise<{ userId: string }>;
+import { RouteParams, UserParams } from "@/types/api";
 
 function SuspenseFallback() {
   return (
@@ -11,7 +11,11 @@ function SuspenseFallback() {
     </div>
   );
 }
-export default async function Page({ params }: { params: Params }) {
+export default async function Page({
+  params,
+}: {
+  params: RouteParams<UserParams>;
+}) {
   const { userId } = await params;
   return (
     <Suspense fallback={<SuspenseFallback />}>

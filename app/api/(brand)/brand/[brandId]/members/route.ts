@@ -8,10 +8,13 @@ import Brand from "@/lib/models/brand";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 import { z } from "zod";
 
-type Params = Promise<{ brandId: string }>;
+import { RouteParams, BrandParams } from "@/types/api";
 
 // Get all members of a brand API
-export const GET = async (request: Request, context: { params: Params }) => {
+export const GET = async (
+  request: Request,
+  context: { params: RouteParams<BrandParams> }
+) => {
   try {
     // Authenticate the request
     const authResult = await authMiddleware(request);
@@ -173,7 +176,10 @@ const DeleteMemberBody = z.object({
 });
 
 // DELETE - Remove member from brand
-export const DELETE = async (request: Request, context: { params: Params }) => {
+export const DELETE = async (
+  request: Request,
+  context: { params: RouteParams<BrandParams> }
+) => {
   try {
     // Authenticate the request
     const authResult = await authMiddleware(request);

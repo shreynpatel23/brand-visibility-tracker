@@ -6,7 +6,7 @@ import Plan from "@/lib/models/plan";
 import Brand from "@/lib/models/brand";
 import { Membership } from "@/lib/models/membership";
 import { ObjectIdString, RoleSchema, StatusSchema } from "@/utils/mongoose";
-import { BrandSummary } from "../../(authentication)/login/route";
+import { BrandSummary } from "@/types/auth";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 
 const GetAllBrandsOfUser = z.object({

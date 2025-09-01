@@ -3,14 +3,15 @@ import crypto from "crypto";
 import * as bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import connect from "@/lib/db";
-import User, { IUser } from "@/lib/models/user";
+import User from "@/lib/models/user";
+import { IUser } from "@/types/auth";
 import { cookies } from "next/headers";
 import { sendEmail } from "@/utils/sendEmail";
 import Plan from "@/lib/models/plan";
 import { verificationEmailTemplate } from "@/utils/verificationEmailTempelate";
 import { Types } from "mongoose";
-import { PlanTypes } from "@/constants/plan-types";
 import { VERIFY_EMAIL } from "@/constants/onboarding-constants";
+import { PlanTypes } from "@/types";
 
 function getVerificationToken(user: IUser): string {
   // Generate the token

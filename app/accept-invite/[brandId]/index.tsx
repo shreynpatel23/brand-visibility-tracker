@@ -7,27 +7,13 @@ import { Button } from "@/components/ui/button";
 import { fetchData, postData } from "@/utils/fetch";
 import Logo from "@/components/logo";
 import Loading from "@/components/loading";
-
-interface IInviteData {
-  name: string;
-  category: string;
-  ownerId: {
-    _id: string;
-    full_name: string;
-    email: string;
-  };
-  invitedBy: {
-    _id: string;
-    full_name: string;
-    email: string;
-  };
-}
+import { InviteData } from "@/types/membership";
 
 const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(true);
-  const [inviteData, setInviteData] = useState<IInviteData>();
+  const [inviteData, setInviteData] = useState<InviteData>();
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const searchParams = useSearchParams();

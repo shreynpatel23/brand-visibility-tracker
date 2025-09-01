@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Loading from "@/components/loading";
 import AcceptInvitePage from "./index";
 
-type Params = Promise<{ brandId: string }>;
+import { RouteParams, BrandParams } from "@/types/api";
 
 function SuspenseFallback() {
   return (
@@ -12,7 +12,11 @@ function SuspenseFallback() {
   );
 }
 
-export default async function Page({ params }: { params: Params }) {
+export default async function Page({
+  params,
+}: {
+  params: RouteParams<BrandParams>;
+}) {
   const { brandId } = await params;
   return (
     <Suspense fallback={<SuspenseFallback />}>

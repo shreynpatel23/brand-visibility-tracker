@@ -18,17 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-interface MatrixData {
-  model: string;
-  stage: "TOFU" | "MOFU" | "BOFU" | "EVFU";
-  score: number;
-  prompts: number;
-  avgResponseTime: number;
-  successRate: number;
-  trend: "up" | "down" | "neutral";
-  trendPercentage: number;
-}
+import { MatrixData } from "@/types/brand";
 
 const MatrixPage: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState("all");

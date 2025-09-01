@@ -6,7 +6,9 @@ import { Membership } from "@/lib/models/membership";
 import { ObjectIdString } from "@/utils/mongoose";
 import connect from "@/lib/db";
 import User from "@/lib/models/user";
-import { IInvite, Invite } from "@/lib/models/invite";
+import { Invite } from "@/lib/models/invite";
+import { IInvite } from "@/types/membership";
+import { RouteParams, BrandParams } from "@/types/api";
 import { inviteMemberEmailTemplate } from "@/utils/inviteMemberEmailTempelate";
 import { sendEmail } from "@/utils/sendEmail";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
@@ -284,12 +286,10 @@ const ResendInviteBody = z.object({
     .default(24), // Default to 24 hours
 });
 
-type Params = Promise<{ brandId: string }>;
-
 // PATCH - Resend invite
 export const PATCH = async (
   request: NextRequest,
-  context: { params: Params }
+  context: { params: RouteParams<BrandParams> }
 ) => {
   try {
     // Authenticate the request

@@ -1,23 +1,5 @@
 import { Schema, model, models } from "mongoose";
-
-export interface IUser {
-  _id: string;
-  full_name: string;
-  email: string;
-  password?: string;
-  is_verified: boolean;
-  verify_token?: string;
-  verify_token_expire?: Date;
-  current_onboarding_step?: string | null;
-  number_of_retries?: number;
-  reset_password_token?: string;
-  reset_password_expire?: Date;
-  plan_id: {
-    _id: string;
-    plan_id: string;
-    plan_name: string;
-  };
-}
+import { IUser } from "@/types/auth";
 
 const UserSchema = new Schema<IUser>(
   {

@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  IOnboardingForm,
-  OnboardingForm,
-} from "@/components/forms/onboarding-form";
+import OnboardingForm from "@/components/forms/onboarding-form";
+import { OnboardingFormData } from "@/types/forms";
 import Logo from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
 import { useRouter } from "next/navigation";
@@ -85,7 +83,7 @@ export default function OnboardingPage({ userId }: { userId: string }) {
               <OnboardingForm
                 userId={userId}
                 setCurrentStep={setCurrentStep}
-                onContinue={(value: IOnboardingForm) =>
+                onContinue={(value: OnboardingFormData) =>
                   router.push(`/${userId}/${value._id}/invite-member`)
                 }
               />

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import connect from "@/lib/db";
-import User, { IUser } from "@/lib/models/user";
+import User from "@/lib/models/user";
+import { IUser } from "@/types/auth";
 import { resetPasswordEmailTemplate } from "@/utils/resetPasswordEmailTempelate";
 import { sendEmail } from "@/utils/sendEmail";
 

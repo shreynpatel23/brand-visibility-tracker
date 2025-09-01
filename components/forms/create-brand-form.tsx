@@ -30,17 +30,6 @@ import Loading from "../loading";
 import { CATEGORIES, REGIONS } from "@/constants/onboarding-constants";
 import { useRouter } from "next/navigation";
 
-export interface ICreateBrandForm {
-  _id: string;
-  name: string;
-  category: string;
-  region: string;
-  targetAudience?: string[];
-  competitors?: string[];
-  useCase?: string;
-  features?: string[];
-}
-
 const formSchema = z.object({
   name: z.string().min(1, "Brand name is required"),
   category: z.string().min(1, "Category is required"),

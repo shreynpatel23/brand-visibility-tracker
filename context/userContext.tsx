@@ -1,6 +1,6 @@
 "use client";
 import Loading from "@/components/loading";
-import { IUser } from "@/lib/models/user";
+import { IUser } from "@/types/auth";
 import { fetchData } from "@/utils/fetch";
 import { redirectToCurrentOnboardingStep } from "@/utils/mapCurrentOnboardingStep";
 import { usePathname, useRouter } from "next/navigation";

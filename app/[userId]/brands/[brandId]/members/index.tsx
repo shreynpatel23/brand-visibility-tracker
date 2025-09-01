@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { BrandMember } from "@/types/member";
+import { BrandMember } from "@/types/membership";
 import {
   Select,
   SelectContent,

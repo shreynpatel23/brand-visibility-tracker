@@ -28,18 +28,7 @@ import { postData } from "@/utils/fetch";
 import ApiError from "../api-error";
 import Loading from "../loading";
 import { CATEGORIES, REGIONS } from "@/constants/onboarding-constants";
-
-export interface IOnboardingForm {
-  _id: string;
-  name: string;
-  category: string;
-  region: string;
-  targetAudience?: string[];
-  competitors?: string[];
-  useCase?: string;
-  features?: string[];
-  teamMembers?: { email: string; role: string }[];
-}
+import { OnboardingFormData } from "@/types/forms";
 
 const formSchema = z.object({
   name: z.string().min(1, "Brand name is required"),
@@ -51,14 +40,14 @@ const formSchema = z.object({
   features: z.array(z.string()).optional(),
 });
 
-export function OnboardingForm({
+export default function OnboardingForm({
   userId,
   setCurrentStep,
   onContinue,
 }: {
   userId: string;
   setCurrentStep: (step: number) => void;
-  onContinue: (data: IOnboardingForm) => void;
+  onContinue: (data: OnboardingFormData) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

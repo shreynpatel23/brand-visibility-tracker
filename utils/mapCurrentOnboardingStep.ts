@@ -1,5 +1,5 @@
 import { VERIFY_EMAIL, CREATE_BRAND } from "@/constants/onboarding-constants";
-import { IUser } from "@/lib/models/user";
+import { IUser } from "@/types/auth";
 
 export function redirectToCurrentOnboardingStep({
   currentOnboardingStep,

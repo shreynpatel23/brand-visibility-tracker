@@ -9,7 +9,7 @@ import { Membership } from "@/lib/models/membership";
 import connect from "@/lib/db";
 import { Types } from "mongoose";
 import Plan from "@/lib/models/plan";
-import { PlanTypes } from "@/constants/plan-types";
+import { PlanTypes } from "@/types";
 
 const AcceptInviteBody = z.object({
   invitedBy: z.string(),

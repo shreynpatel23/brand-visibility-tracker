@@ -1,20 +1,5 @@
 import { Schema, Types, model, models } from "mongoose";
-import { Role } from "./membership";
-
-export interface IInvite {
-  _id: Types.ObjectId;
-  brand_id: Types.ObjectId;
-  email: string;
-  role: Role;
-  invited_by: Types.ObjectId;
-  verify_token?: string;
-  verify_token_expire?: Date;
-  accepted_at?: Date | null;
-  revoked_at?: Date | null;
-  status: "pending" | "accepted" | "expired" | "revoked";
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { IInvite } from "@/types/membership";
 
 const InviteSchema = new Schema<IInvite>(
   {

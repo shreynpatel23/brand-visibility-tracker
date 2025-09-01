@@ -18,7 +18,7 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { IBrand } from "@/lib/models/brand";
+import { IBrand } from "@/types/brand";
 import Link from "next/link";
 import { fetchData, deleteData } from "@/utils/fetch";
 import Loading from "@/components/loading";

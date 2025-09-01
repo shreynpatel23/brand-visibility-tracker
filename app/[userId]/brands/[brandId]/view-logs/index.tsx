@@ -13,19 +13,7 @@ import {
   Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  model: string;
-  stage: "TOFU" | "MOFU" | "BOFU" | "EVFU";
-  prompt: string;
-  response: string;
-  score: number;
-  responseTime: number;
-  status: "success" | "error" | "warning";
-  userId: string;
-}
+import { LogEntry } from "@/types/brand";
 
 export default function ViewLogs({
   userId,
