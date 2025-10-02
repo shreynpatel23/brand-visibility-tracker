@@ -98,6 +98,28 @@ export interface LogEntry {
 }
 // Legacy interfaces removed - using MultiPromptAnalysis only
 
+// Heatmap Data Types
+export interface HeatmapData {
+  stages: string[];
+  models: string[];
+  matrix: Array<{
+    stage: string;
+    model: string;
+    score: number;
+    weightedScore: number;
+    analyses: number;
+    performance_level: "excellent" | "good" | "fair" | "poor";
+    trend: "up" | "down" | "neutral";
+    confidence: number;
+  }>;
+  summary: {
+    best_combination: { stage: string; model: string; score: number };
+    worst_combination: { stage: string; model: string; score: number };
+    avg_score_by_stage: Record<string, number>;
+    avg_score_by_model: Record<string, number>;
+  };
+}
+
 // API Response Types
 export interface DashboardResponse {
   brand: {
@@ -139,6 +161,7 @@ export interface DashboardResponse {
     scores: number[];
     prompts: number[];
   };
+  heatmapData?: HeatmapData; // Add heatmap data
   filters: {
     period: string;
     model: string;

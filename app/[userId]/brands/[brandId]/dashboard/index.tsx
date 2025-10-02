@@ -24,6 +24,7 @@ import { DashboardBrand, DashboardResponse } from "@/types/brand";
 import { useUserContext } from "@/context/userContext";
 import { fetchData } from "@/utils/fetch";
 import Loading from "@/components/loading";
+import FunnelHeatmap from "@/components/funnel-heatmap";
 import { models, periods, stages } from "@/constants/dashboard";
 
 const DashboardPage = ({
@@ -628,6 +629,17 @@ const DashboardPage = ({
           icon={<Activity className="w-5 h-5 text-primary" />}
         />
       </div>
+
+      {/* Heatmap Section */}
+      {dashboardData.heatmapData && (
+        <div className="mb-6">
+          <FunnelHeatmap
+            data={dashboardData.heatmapData}
+            title="Stage vs Model Performance Matrix"
+            showSummary={true}
+          />
+        </div>
+      )}
 
       {/* Main Analytics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

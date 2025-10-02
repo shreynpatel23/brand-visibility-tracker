@@ -136,14 +136,6 @@ export async function GET(request: NextRequest) {
 
 // create brand api
 export async function POST(request: NextRequest) {
-  // Authenticate the request
-  const authResult = await authMiddleware(request);
-  if (!authResult.isValid) {
-    return new NextResponse(
-      JSON.stringify({ message: "Unauthorized access!" }),
-      { status: 401 }
-    );
-  }
   // Parse and validate the request body
   const parse = CreateBrandBody.safeParse(await request.json());
   if (!parse.success) {

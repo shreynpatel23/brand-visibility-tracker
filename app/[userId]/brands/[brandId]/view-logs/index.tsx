@@ -34,7 +34,8 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import AnalysisStartedModal from "@/components/analysis-started-modal";
+import { useMatrixRefresh } from "@/context/matrixContext";
 
 export default function ViewLogs({
   userId,
@@ -43,8 +44,8 @@ export default function ViewLogs({
   userId: string;
   brandId: string;
 }) {
-  const router = useRouter();
   const { user } = useUserContext();
+  const refreshMatrixData = useMatrixRefresh();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedModel, setSelectedModel] = useState("all");
   const [selectedStage, setSelectedStage] = useState("all");
@@ -55,9 +56,10 @@ export default function ViewLogs({
   const [error, setError] = useState("");
   const [triggeringAnalysis, setTriggeringAnalysis] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit] = useState(10); // setLimit removed as not currently used
   const [sortBy, setSortBy] = useState("createdAt");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
   // Helper function to toggle row expansion
   const toggleRowExpansion = (logId: string) => {
@@ -130,21 +132,19 @@ export default function ViewLogs({
         userId: user._id,
       };
 
-      const response = await postData(
-        `/api/brand/${brandId}/logs`,
-        requestBody
-      );
+      await postData(`/api/brand/${brandId}/logs`, requestBody);
 
-      // Refresh logs after successful analysis
+      // Show the analysis started modal
+      setShowAnalysisModal(true);
+
+      // Refresh matrix data immediately since analysis has started
+      await refreshMatrixData();
+
+      // Refresh logs after a delay to potentially show any immediate updates
       setTimeout(() => {
         setCurrentPage(1); // Reset to first page
         // This will trigger the useEffect to refresh data
       }, 2000);
-
-      toast.success(
-        "Analysis triggered successfully! Check back in a few moments."
-      );
-      router.refresh();
     } catch (err) {
       const errorMsg =
         err instanceof Error ? err.message : "Failed to trigger analysis";
@@ -689,6 +689,14 @@ export default function ViewLogs({
           )}
         </div>
       </div>
+
+      {/* Analysis Started Modal */}
+      <AnalysisStartedModal
+        isOpen={showAnalysisModal}
+        onClose={() => setShowAnalysisModal(false)}
+        brandName="your brand"
+        userEmail={user?.email}
+      />
     </div>
   );
 }

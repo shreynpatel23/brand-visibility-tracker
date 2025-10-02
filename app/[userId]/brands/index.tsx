@@ -27,6 +27,12 @@ import Header from "@/components/header";
 import { CATEGORIES } from "@/constants/onboarding-constants";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import BrandMatrixSummaryComponent from "@/components/brand-matrix-summary";
+import {
+  MatrixProvider,
+  useMatrix,
+  useBrandMatrix,
+} from "@/context/matrixContext";
 import {
   Dialog,
   DialogContent,
@@ -35,8 +41,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
-const BrandList = ({ userId }: { userId: string }) => {
+const BrandListContent = ({ userId }: { userId: string }) => {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -47,6 +54,17 @@ const BrandList = ({ userId }: { userId: string }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [brandToDelete, setBrandToDelete] = useState<IBrand | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Use Matrix Context
+  const {
+    loading: matrixLoading,
+    selectedPeriod,
+    showMatrixData,
+    setSelectedPeriod,
+    setShowMatrixData,
+    refreshMatrixData,
+    getMatrixDataForBrand,
+  } = useMatrix();
 
   useEffect(() => {
     async function fetchAllBrandsOfUser() {
@@ -84,6 +102,8 @@ const BrandList = ({ userId }: { userId: string }) => {
       setBrands((prevBrands) =>
         prevBrands.filter((brand) => brand._id !== brandToDelete._id)
       );
+      // Refresh matrix data to remove deleted brand
+      await refreshMatrixData();
       setDeleteDialogOpen(false);
       setBrandToDelete(null);
     } catch (error) {
@@ -183,63 +203,73 @@ const BrandList = ({ userId }: { userId: string }) => {
     );
   }
 
-  const BrandCard: React.FC<{ brand: IBrand }> = ({ brand }) => (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center">
-          <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-accent dark:text-accent" />
-          </div>
-          <div className="ml-3">
-            <Link
-              href={`/${userId}/brands/${brand._id}/dashboard`}
-              className="text-lg font-semibold text-gray-900 dark:text-white underline hover:text-primary"
-            >
-              {brand.name}
-            </Link>
-            <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-              <span>{brand.category}</span>
-              <span>•</span>
-              <span>{brand.region}</span>
+  const BrandCard: React.FC<{ brand: IBrand }> = ({ brand }) => {
+    const { matrixData: brandMatrixData, loading: brandMatrixLoading } =
+      useBrandMatrix(brand._id.toString());
+
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-accent dark:text-accent" />
+            </div>
+            <div className="ml-3">
+              <Link
+                href={`/${userId}/brands/${brand._id}/dashboard`}
+                className="text-lg font-semibold text-gray-900 dark:text-white underline hover:text-primary"
+              >
+                {brand.name}
+              </Link>
+              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                <span>{brand.category}</span>
+                <span>•</span>
+                <span>{brand.region}</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-2">
-          {/* <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(brand.status)}`}>
+          <div className="flex items-center space-x-2">
+            {/* <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(brand.status)}`}>
             {brand.status}
           </span> */}
-          <ActionMenu brand={brand} />
+            <ActionMenu brand={brand} />
+          </div>
+        </div>
+
+        {/* Matrix Data Section */}
+        {showMatrixData && (
+          <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            {brandMatrixLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loading message="Loading metrics..." />
+              </div>
+            ) : brandMatrixData ? (
+              <BrandMatrixSummaryComponent
+                matrixData={brandMatrixData}
+                compact
+              />
+            ) : (
+              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                <p className="text-sm">No analysis data available</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-between text-sm">
+          <Link
+            href={`/${userId}/brands/${brand._id}/view-logs`}
+            className="font-bold text-accent dark:text-accent hover:text-accent/80 dark:hover:text-accent/80 transition-colors"
+          >
+            View Logs
+          </Link>
+          <span className="text-gray-500 dark:text-gray-400">
+            Created {formatDate(brand.createdAt)}
+          </span>
         </div>
       </div>
-
-      {/* <div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-white">{brand.totalPrompts}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Total Prompts</div>
-        </div>
-        <div className="text-center">
-          <div className={`text-lg font-semibold ${getScoreColor(brand.avgScore)}`}>{brand.avgScore}%</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Avg Score</div>
-        </div>
-        <div className="text-center">
-          <div className="text-lg font-semibold text-gray-900 dark:text-white">{formatDate(brand.lastUpdated)}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">Last Updated</div>
-        </div>
-      </div> */}
-
-      <div className="flex justify-between text-sm">
-        <Link
-          href={`/${userId}/brands/${brand._id}/view-logs`}
-          className="font-bold text-accent dark:text-accent hover:text-accent/80 dark:hover:text-accent/80 transition-colors"
-        >
-          View Logs
-        </Link>
-        <span className="text-gray-500 dark:text-gray-400">
-          Created {formatDate(brand.createdAt)}
-        </span>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const BrandTable: React.FC = () => (
     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -254,6 +284,19 @@ const BrandList = ({ userId }: { userId: string }) => {
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Region
           </th>
+          {showMatrixData && (
+            <>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Avg Score
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Analyses
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Success Rate
+              </th>
+            </>
+          )}
           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             Last Updated
           </th>
@@ -263,40 +306,97 @@ const BrandList = ({ userId }: { userId: string }) => {
         </tr>
       </thead>
       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-        {filteredBrands.map((brand) => (
-          <tr
-            key={`${brand._id}-${brand.name}`}
-            className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <td className="px-6 py-4 whitespace-nowrap">
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-md flex items-center justify-center mr-3">
-                  <Building2 className="w-4 h-4 text-accent dark:text-accent" />
+        {filteredBrands.map((brand) => {
+          const brandMatrixData = getMatrixDataForBrand(brand._id.toString());
+
+          return (
+            <tr
+              key={`${brand._id}-${brand.name}`}
+              className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-md flex items-center justify-center mr-3">
+                    <Building2 className="w-4 h-4 text-accent dark:text-accent" />
+                  </div>
+                  <Link
+                    href={`/${userId}/brands/${brand._id}/dashboard`}
+                    className="text-sm font-medium text-gray-900 dark:text-white underline hover:text-primary"
+                  >
+                    {brand.name}
+                  </Link>
                 </div>
-                <Link
-                  href={`/${userId}/brands/${brand._id}/dashboard`}
-                  className="text-sm font-medium text-gray-900 dark:text-white underline hover:text-primary"
-                >
-                  {brand.name}
-                </Link>
-              </div>
-            </td>
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-              {brand.category}
-            </td>
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-              {brand.region}
-            </td>
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-              {formatDate(brand.updatedAt)}
-            </td>
-            <td className="px-6 py-4 text-left">
-              <div className="flex items-center">
-                <ActionMenu brand={brand} />
-              </div>
-            </td>
-          </tr>
-        ))}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                {brand.category}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                {brand.region}
+              </td>
+              {showMatrixData && (
+                <>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {matrixLoading ? (
+                      <div className="animate-pulse bg-gray-200 dark:bg-gray-600 h-4 w-12 rounded"></div>
+                    ) : brandMatrixData?.hasData ? (
+                      <span
+                        className={`font-medium ${
+                          brandMatrixData.avgWeightedScore >= 80
+                            ? "text-green-600 dark:text-green-400"
+                            : brandMatrixData.avgWeightedScore >= 60
+                            ? "text-yellow-600 dark:text-yellow-400"
+                            : brandMatrixData.avgWeightedScore >= 40
+                            ? "text-orange-600 dark:text-orange-400"
+                            : "text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {brandMatrixData.avgWeightedScore}%
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">No data</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {matrixLoading ? (
+                      <div className="animate-pulse bg-gray-200 dark:bg-gray-600 h-4 w-8 rounded"></div>
+                    ) : brandMatrixData?.hasData ? (
+                      brandMatrixData.totalAnalyses
+                    ) : (
+                      <span className="text-gray-400 text-xs">-</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {matrixLoading ? (
+                      <div className="animate-pulse bg-gray-200 dark:bg-gray-600 h-4 w-12 rounded"></div>
+                    ) : brandMatrixData?.hasData ? (
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          brandMatrixData.successRate >= 90
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : brandMatrixData.successRate >= 70
+                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                        }`}
+                      >
+                        {brandMatrixData.successRate}%
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">-</span>
+                    )}
+                  </td>
+                </>
+              )}
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                {formatDate(brand.updatedAt)}
+              </td>
+              <td className="px-6 py-4 text-left">
+                <div className="flex items-center">
+                  <ActionMenu brand={brand} />
+                </div>
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -361,27 +461,64 @@ const BrandList = ({ userId }: { userId: string }) => {
                 </SelectContent>
               </Select>
 
-              <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
-                <button
-                  onClick={() => setViewMode("card")}
-                  className={`px-3 py-2 text-sm font-medium ${
-                    viewMode === "card"
-                      ? "bg-accent/5 dark:bg-accent/5 text-accent dark:text-accent"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  } transition-colors`}
-                >
-                  Cards
-                </button>
-                <button
-                  onClick={() => setViewMode("table")}
-                  className={`px-3 py-2 text-sm font-medium border-l border-gray-300 dark:border-gray-600 ${
-                    viewMode === "table"
-                      ? "bg-accent/5 dark:bg-accent/5 text-accent dark:text-accent"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-                  } transition-colors`}
-                >
-                  Table
-                </button>
+              <div className="flex items-center space-x-4">
+                {/* Matrix Data Toggle */}
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="showMatrix"
+                    checked={showMatrixData}
+                    onCheckedChange={(checked) =>
+                      setShowMatrixData(checked === true)
+                    }
+                  />
+                  <label
+                    htmlFor="showMatrix"
+                    className="text-sm text-gray-700 dark:text-gray-300"
+                  >
+                    Show Analytics
+                  </label>
+                </div>
+
+                {/* Period Selection */}
+                {showMatrixData && (
+                  <Select
+                    value={selectedPeriod}
+                    onValueChange={setSelectedPeriod}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7d">7 days</SelectItem>
+                      <SelectItem value="30d">30 days</SelectItem>
+                      <SelectItem value="90d">90 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* View Mode Toggle */}
+                <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
+                  <button
+                    onClick={() => setViewMode("card")}
+                    className={`px-3 py-2 text-sm font-medium ${
+                      viewMode === "card"
+                        ? "bg-accent/5 dark:bg-accent/5 text-accent dark:text-accent"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    } transition-colors`}
+                  >
+                    Cards
+                  </button>
+                  <button
+                    onClick={() => setViewMode("table")}
+                    className={`px-3 py-2 text-sm font-medium border-l border-gray-300 dark:border-gray-600 ${
+                      viewMode === "table"
+                        ? "bg-accent/5 dark:bg-accent/5 text-accent dark:text-accent"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                    } transition-colors`}
+                  >
+                    Table
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -438,9 +575,9 @@ const BrandList = ({ userId }: { userId: string }) => {
           <DialogHeader>
             <DialogTitle>Delete Brand</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{brandToDelete?.name}"? This
-              action cannot be undone and will permanently remove all associated
-              data.
+              Are you sure you want to delete &quot;{brandToDelete?.name}&quot;?
+              This action cannot be undone and will permanently remove all
+              associated data.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -466,6 +603,15 @@ const BrandList = ({ userId }: { userId: string }) => {
         </DialogContent>
       </Dialog>
     </div>
+  );
+};
+
+// Wrapper component with MatrixProvider (temporary fallback)
+const BrandList = ({ userId }: { userId: string }) => {
+  return (
+    <MatrixProvider userId={userId}>
+      <BrandListContent userId={userId} />
+    </MatrixProvider>
   );
 };
 

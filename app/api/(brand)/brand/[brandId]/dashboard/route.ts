@@ -5,6 +5,7 @@ import Brand from "@/lib/models/brand";
 import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 import { Membership } from "@/lib/models/membership";
+import { DataOrganizationService } from "@/lib/services/dataOrganizationService";
 import { z } from "zod";
 import { RouteParams, BrandParams } from "@/types/api";
 
@@ -287,6 +288,156 @@ export const GET = async (
       weeklyData.prompts.push(dayData.length);
     }
 
+    // Generate heatmap data (Stage vs Model performance matrix)
+    const stages: (keyof typeof scores)[] = ["TOFU", "MOFU", "BOFU", "EVFU"];
+    const models: (keyof typeof modelPerformance)[] = [
+      "ChatGPT",
+      "Claude",
+      "Gemini",
+    ];
+
+    const heatmapData = {
+      stages,
+      models,
+      matrix: [] as Array<{
+        stage: string;
+        model: string;
+        score: number;
+        weightedScore: number;
+        analyses: number;
+        performance_level: "excellent" | "good" | "fair" | "poor";
+        trend: "up" | "down" | "neutral";
+        confidence: number;
+      }>,
+      summary: {
+        best_combination: { stage: "", model: "", score: 0 },
+        worst_combination: { stage: "", model: "", score: 100 },
+        avg_score_by_stage: {} as Record<string, number>,
+        avg_score_by_model: {} as Record<string, number>,
+      },
+    };
+
+    // Calculate matrix data for each stage-model combination
+    for (const stage of stages) {
+      for (const model of models) {
+        const stageModelData = analysisData.filter(
+          (item) => item.stage === stage && item.model === model
+        );
+
+        if (stageModelData.length === 0) {
+          heatmapData.matrix.push({
+            stage,
+            model,
+            score: 0,
+            weightedScore: 0,
+            analyses: 0,
+            performance_level: "poor",
+            trend: "neutral",
+            confidence: 0,
+          });
+          continue;
+        }
+
+        const avgScore =
+          stageModelData.reduce((sum, item) => sum + item.overall_score, 0) /
+          stageModelData.length;
+        const avgWeightedScore =
+          stageModelData.reduce((sum, item) => sum + item.weighted_score, 0) /
+          stageModelData.length;
+        const avgSuccessRate =
+          stageModelData.reduce((sum, item) => sum + item.success_rate, 0) /
+          stageModelData.length;
+
+        // Determine performance level
+        let performance_level: "excellent" | "good" | "fair" | "poor";
+        if (avgWeightedScore >= 80) performance_level = "excellent";
+        else if (avgWeightedScore >= 60) performance_level = "good";
+        else if (avgWeightedScore >= 40) performance_level = "fair";
+        else performance_level = "poor";
+
+        // Calculate trend (compare with previous period)
+        const previousPeriodStart = new Date(
+          startDate.getTime() - (endDate.getTime() - startDate.getTime())
+        );
+        const previousPeriodEnd = new Date(startDate);
+
+        const previousData = await MultiPromptAnalysis.find({
+          brand_id: brandId,
+          stage,
+          model,
+          createdAt: { $gte: previousPeriodStart, $lte: previousPeriodEnd },
+          status: "success",
+        });
+
+        const previousAvgScore =
+          previousData.length > 0
+            ? previousData.reduce((sum, item) => sum + item.weighted_score, 0) /
+              previousData.length
+            : avgWeightedScore;
+
+        const change =
+          previousAvgScore > 0
+            ? ((avgWeightedScore - previousAvgScore) / previousAvgScore) * 100
+            : 0;
+        const trend: "up" | "down" | "neutral" =
+          change > 5 ? "up" : change < -5 ? "down" : "neutral";
+
+        heatmapData.matrix.push({
+          stage,
+          model,
+          score: Math.round(avgScore * 100) / 100,
+          weightedScore: Math.round(avgWeightedScore * 100) / 100,
+          analyses: stageModelData.length,
+          performance_level,
+          trend,
+          confidence: Math.round(avgSuccessRate * 100) / 100,
+        });
+
+        // Track best and worst combinations
+        if (avgWeightedScore > heatmapData.summary.best_combination.score) {
+          heatmapData.summary.best_combination = {
+            stage,
+            model,
+            score: Math.round(avgWeightedScore * 100) / 100,
+          };
+        }
+        if (avgWeightedScore < heatmapData.summary.worst_combination.score) {
+          heatmapData.summary.worst_combination = {
+            stage,
+            model,
+            score: Math.round(avgWeightedScore * 100) / 100,
+          };
+        }
+      }
+    }
+
+    // Calculate average scores by stage and model
+    for (const stage of stages) {
+      const stageData = heatmapData.matrix.filter(
+        (item) => item.stage === stage
+      );
+      const avgStageScore =
+        stageData.length > 0
+          ? stageData.reduce((sum, item) => sum + item.weightedScore, 0) /
+            stageData.length
+          : 0;
+      heatmapData.summary.avg_score_by_stage[stage] =
+        Math.round(avgStageScore * 100) / 100;
+    }
+
+    for (const model of models) {
+      const modelData = heatmapData.matrix.filter(
+        (item) => item.model === model
+      );
+      const avgModelScore =
+        modelData.length > 0
+          ? modelData.reduce((sum, item) => sum + item.weightedScore, 0) /
+            modelData.length
+          : 0;
+      heatmapData.summary.avg_score_by_model[model] =
+        Math.round(avgModelScore * 100) / 100;
+    }
+
     const response = {
       brand: {
         id: brand._id,
@@ -335,6 +486,7 @@ export const GET = async (
         },
       },
       weeklyData,
+      heatmapData, // Add heatmap data to response
       filters: {
         period,
         model,

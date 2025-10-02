@@ -1,5 +1,6 @@
 import { AIModel, AnalysisStage } from "@/types/brand";
 import { PromptService, ProcessedPrompt } from "./promptService";
+import { ScoringService, ScoringResult } from "./scoringService";
 
 // Simplified AI service focused on accurate matrix generation
 export class AIService {
@@ -24,10 +25,10 @@ export class AIService {
 
 IMPORTANT: Please provide your analysis in this EXACT format:
 
-SCORE: [Provide a numerical score from 0-100 for brand performance/visibility]
+SCORE: [Provide a numerical score from 0-100 for brand performance/visibility. If there is a comparision please provide the comparison score.]
 SENTIMENT: [Must be exactly one of: positive, neutral, negative]
 CONFIDENCE: [Your confidence level in this analysis from 0-100]
-MENTION_POSITION: [If the brand is mentioned, what position/rank? Use 1-5, or 0 if not mentioned]
+MENTION_POSITION: [If the brand is mentioned, what position/rank? Use 1-5, or 0 if not mentioned. If there is a comparision please provide the comparison position.]
 POSITIVE_PERCENTAGE: [Percentage of positive sentiment, 0-100]
 NEUTRAL_PERCENTAGE: [Percentage of neutral sentiment, 0-100]
 NEGATIVE_PERCENTAGE: [Percentage of negative sentiment, 0-100]
@@ -247,7 +248,7 @@ Please ensure all numerical values are clearly specified and percentages add up 
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-3-sonnet-20240229",
+          model: "claude-3-5-sonnet-20240620",
           max_tokens: 800,
           messages: [
             { role: "user", content: this.createStructuredPrompt(prompt) },
@@ -473,37 +474,25 @@ Please ensure all numerical values are clearly specified and percentages add up 
   }
 
   /**
-   * Calculate weighted score based on brand mention position
+   * Calculate comprehensive weighted score using enhanced scoring service
    */
   private static calculateWeightedScore(
     score: number,
     mentionPosition: number,
-    weights: ProcessedPrompt["weights"]
-  ): number {
-    let weightMultiplier: number;
-
-    switch (mentionPosition) {
-      case 1:
-        weightMultiplier = weights.weight_first;
-        break;
-      case 2:
-        weightMultiplier = weights.weight_second;
-        break;
-      case 3:
-        weightMultiplier = weights.weight_third;
-        break;
-      case 4:
-        weightMultiplier = weights.weight_fourth;
-        break;
-      case 5:
-        weightMultiplier = weights.weight_fifth;
-        break;
-      default:
-        weightMultiplier = weights.weight_absent;
-        break;
+    stage: AnalysisStage,
+    prompt: ProcessedPrompt,
+    sentiment: {
+      overall: "positive" | "neutral" | "negative";
+      confidence: number;
     }
-
-    return score * weightMultiplier;
+  ): ScoringResult {
+    return ScoringService.calculateWeightedScore(
+      score,
+      mentionPosition,
+      stage,
+      prompt,
+      sentiment
+    );
   }
 
   /**
@@ -585,31 +574,32 @@ Please ensure all numerical values are clearly specified and percentages add up 
             processedPromptText
           );
 
-          // Calculate weighted score
-          const weightedScore = this.calculateWeightedScore(
+          // Calculate comprehensive weighted score
+          const scoringResult = this.calculateWeightedScore(
             analysisResult.score,
             analysisResult.mentionPosition,
-            prompt.weights
+            stage,
+            prompt,
+            analysisResult.sentiment
           );
 
           promptResults.push({
             promptId: prompt.prompt_id,
             promptText: processedPromptText,
             score: analysisResult.score,
-            weightedScore: weightedScore,
+            weightedScore: scoringResult.position_weighted_score,
             mentionPosition: analysisResult.mentionPosition,
-            response: analysisResult.response,
+            response: analysisResult.analysis,
             responseTime: analysisResult.responseTime,
             sentiment: analysisResult.sentiment,
             status: analysisResult.status,
+            scoringDetails: scoringResult, // Add detailed scoring information
           });
 
           if (analysisResult.status === "success") {
             successfulPrompts++;
-            const finalWeightedScore =
-              weightedScore * prompt.weights.base_weight;
-            totalWeightedScore += finalWeightedScore;
-            totalWeightSum += prompt.weights.base_weight;
+            totalWeightedScore += scoringResult.position_weighted_score;
+            totalWeightSum += 1;
 
             // Aggregate sentiment data
             Object.keys(sentimentScores).forEach((key) => {

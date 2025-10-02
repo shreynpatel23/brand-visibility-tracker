@@ -43,7 +43,7 @@ export class PromptService {
     try {
       const csvFilePath = path.join(
         process.cwd(),
-        "mvp_prompts_1752263341495.csv"
+        "mvp_prompts_with_funnel_scoring.csv"
       );
       const csvContent = await fs.readFile(csvFilePath, "utf-8");
 
