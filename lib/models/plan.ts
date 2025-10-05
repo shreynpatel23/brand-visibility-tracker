@@ -29,6 +29,17 @@ const PlanSchema = new Schema<IPlan>(
     features: {
       type: Array<string>,
     },
+    credits_included: {
+      type: Number,
+      default: 0,
+    },
+    is_credit_based: {
+      type: Boolean,
+      default: false,
+    },
+    stripe_price_id: {
+      type: String,
+    },
   },
   {
     timestamps: true,

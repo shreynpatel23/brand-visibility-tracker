@@ -13,6 +13,7 @@ import { AIModel, AnalysisStage } from "@/types/brand";
 import User from "@/lib/models/user";
 import { sendEmail } from "@/utils/sendEmail";
 import { analysisCompletionEmailTemplate } from "@/utils/analysisCompletionEmailTemplate";
+import { CreditService } from "@/lib/services/creditService";
 
 const LogsQuerySchema = z.object({
   userId: z.string().min(1, "User ID is required"),
@@ -656,6 +657,62 @@ export const POST = async (
       "EVFU",
     ];
 
+    // Validate analysis request and check credits
+    const validation = CreditService.validateAnalysisRequest(modelsToAnalyze);
+
+    if (!validation.isValid) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Invalid analysis request!",
+          errors: validation.errors,
+        }),
+        { status: 400 }
+      );
+    }
+
+    // Check if user has enough credits
+    const creditCheck = await CreditService.hasEnoughCredits(
+      userId,
+      validation.creditsNeeded
+    );
+
+    if (!creditCheck.hasEnough) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Insufficient credits for this analysis!",
+          data: {
+            required: validation.creditsNeeded,
+            available: creditCheck.currentBalance,
+            breakdown: validation.breakdown,
+          },
+        }),
+        { status: 402 } // Payment Required
+      );
+    }
+
+    // Generate analysis ID for tracking
+    const analysisId = `multi-${brandId}-${Date.now()}`;
+
+    // Deduct credits before starting analysis
+    try {
+      await CreditService.deductCredits(
+        userId,
+        validation.creditsNeeded,
+        analysisId,
+        `Analysis for brand: ${brand.name} (${modelsToAnalyze.join(
+          ", "
+        )} - ${stagesToAnalyze.join(", ")})`
+      );
+    } catch (error) {
+      console.error("Error deducting credits:", error);
+      return new NextResponse(
+        JSON.stringify({
+          message: "Error processing credits. Please try again.",
+        }),
+        { status: 500 }
+      );
+    }
+
     // Start analysis in background
     console.log(`Triggering background analysis for brand ${brand.name}`);
 
@@ -676,11 +733,14 @@ export const POST = async (
         message:
           "Analysis started successfully! You will receive an email notification once the analysis is complete.",
         data: {
-          analysisId: `multi-${brandId}-${Date.now()}`,
+          analysisId,
           status: "started",
           estimatedCompletionTime: "5-10 minutes",
           notificationEmail:
             "You will receive an email when analysis is complete",
+          creditsUsed: validation.creditsNeeded,
+          modelsAnalyzed: modelsToAnalyze,
+          stagesAnalyzed: stagesToAnalyze,
         },
       }),
       {

@@ -89,7 +89,26 @@ export interface LogEntry {
   timestamp: string;
   model: string;
   stage: AnalysisStage;
-  prompt: string;
+  promptResults: Array<{
+    promptId: string;
+    promptText: string;
+    score: number;
+    weightedScore: number;
+    mentionPosition: number;
+    response: string;
+    responseTime: number;
+    sentiment: {
+      overall: "positive" | "neutral" | "negative";
+      confidence: number;
+      distribution: {
+        positive: number;
+        neutral: number;
+        negative: number;
+        stronglyPositive: number;
+      };
+    };
+    status: "success" | "error" | "warning";
+  }>;
   response: string;
   score: number;
   responseTime: number;

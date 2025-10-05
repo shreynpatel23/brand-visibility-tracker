@@ -70,7 +70,7 @@ export default function AnalysisStartedModal({
             </div>
           </div>
 
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
             <p className="text-sm text-gray-600">
               <strong>What happens next?</strong>
             </p>

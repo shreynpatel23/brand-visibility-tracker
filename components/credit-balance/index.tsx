@@ -1,0 +1,197 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Coins, Plus, TrendingUp, TrendingDown } from "lucide-react";
+import { toast } from "sonner";
+import Loading from "../loading";
+import { useRouter } from "next/navigation";
+import { fetchData } from "@/utils/fetch";
+
+interface CreditStats {
+  currentBalance: number;
+  totalPurchased: number;
+  totalUsed: number;
+  recentTransactions: Array<{
+    _id: string;
+    type: "purchase" | "usage" | "refund" | "bonus";
+    amount: number;
+    description: string;
+    createdAt: string;
+  }>;
+}
+
+interface CreditBalanceProps {
+  userId: string;
+  onPurchaseClick?: () => void;
+  showPurchaseButton?: boolean;
+  compact?: boolean;
+  purchaseUrl?: string;
+}
+
+export function CreditBalance({
+  userId,
+  onPurchaseClick,
+  showPurchaseButton = true,
+  compact = false,
+  purchaseUrl,
+}: CreditBalanceProps) {
+  const [creditStats, setCreditStats] = useState<CreditStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const fetchCreditBalance = async () => {
+    try {
+      setLoading(true);
+      const response = await fetchData(`/api/credits/balance?userId=${userId}`);
+      const { data } = response;
+      setCreditStats(data);
+      setError(null);
+    } catch (err) {
+      console.log("Error fetching credit balance:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to load credit balance"
+      );
+      toast.error("Failed to load credit balance");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetchCreditBalance();
+    }
+  }, [userId]);
+
+  const handlePurchaseClick = () => {
+    if (onPurchaseClick) {
+      onPurchaseClick();
+    } else {
+      router.push(purchaseUrl || "/credits/purchase");
+    }
+  };
+
+  if (loading) {
+    return <Loading message="Loading credit balance..." />;
+  }
+
+  if (error || !creditStats) {
+    return (
+      <div
+        className={`flex items-center justify-between ${
+          compact ? "p-2" : "p-4"
+        } border rounded-lg border-red-200 bg-red-50`}
+      >
+        <div className="flex items-center gap-3">
+          <Coins className="h-5 w-5 text-red-500" />
+          <span className="text-sm text-red-600">Failed to load credits</span>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={fetchCreditBalance}
+          className="text-red-600 border-red-300 hover:bg-red-100"
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const { currentBalance, totalPurchased, totalUsed } = creditStats;
+  const isLowBalance = currentBalance < 10;
+  const balanceColor = isLowBalance
+    ? "text-red-600"
+    : currentBalance < 50
+    ? "text-yellow-600"
+    : "text-green-600";
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Coins className="h-4 w-4 text-gray-500" />
+          <p className="text-sm text-gray-500">Available Credits:</p>
+          <span className={`font-semibold ${balanceColor}`}>
+            {currentBalance}
+          </span>
+        </div>
+        {showPurchaseButton && isLowBalance && (
+          <Button size="sm" variant="outline" onClick={handlePurchaseClick}>
+            <Plus className="h-3 w-3 mr-1" />
+            Buy
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:bg-gradient-to-r dark:from-blue-900 dark:to-purple-900">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-100 rounded-full">
+            <Coins className="h-5 w-5 text-accent" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-200">
+              Credit Balance
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-200">
+              Available for analysis
+            </p>
+          </div>
+        </div>
+        {showPurchaseButton && (
+          <Button onClick={handlePurchaseClick} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Buy Credits
+          </Button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="text-center">
+          <div className={`text-2xl font-bold ${balanceColor}`}>
+            {currentBalance}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-200">
+            Available
+          </div>
+          {isLowBalance && (
+            <Badge variant="destructive" className="mt-1 text-xs">
+              Low Balance
+            </Badge>
+          )}
+        </div>
+
+        <div className="text-center">
+          <div className="text-lg font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-1">
+            <TrendingUp className="h-4 w-4 text-green-500" />
+            {totalPurchased}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-200">
+            Purchased
+          </div>
+        </div>
+
+        <div className="text-center">
+          <div className="text-lg font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-1">
+            <TrendingDown className="h-4 w-4 text-orange-500" />
+            {totalUsed}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-200">Used</div>
+        </div>
+      </div>
+
+      {isLowBalance && (
+        <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800 dark:bg-yellow-900 dark:border-yellow-800 dark:text-yellow-200">
+          ⚠️ Low credit balance. Consider purchasing more credits to continue
+          analysis.
+        </div>
+      )}
+    </div>
+  );
+}

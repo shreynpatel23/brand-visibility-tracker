@@ -10,6 +10,7 @@ import connect from "@/lib/db";
 import { Types } from "mongoose";
 import Plan from "@/lib/models/plan";
 import { PlanTypes } from "@/types";
+import { CreditService } from "@/lib/services/creditService";
 
 const AcceptInviteBody = z.object({
   invitedBy: z.string(),
@@ -132,6 +133,14 @@ export async function POST(
       });
       user = newUser;
       await newUser.save();
+
+      // Assign free credits to new user
+      try {
+        await CreditService.assignFreeCredits(newUser._id.toString());
+      } catch (error) {
+        console.error("Error assigning free credits:", error);
+        // Don't fail invite acceptance if credit assignment fails
+      }
     } else {
       user = existingUser;
     }

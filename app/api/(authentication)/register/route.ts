@@ -12,6 +12,7 @@ import { verificationEmailTemplate } from "@/utils/verificationEmailTempelate";
 import { Types } from "mongoose";
 import { VERIFY_EMAIL } from "@/constants/onboarding-constants";
 import { PlanTypes } from "@/types";
+import { CreditService } from "@/lib/services/creditService";
 
 function getVerificationToken(user: IUser): string {
   // Generate the token
@@ -68,6 +69,14 @@ export const POST = async (request: Request) => {
     // generate a verification token for the user and save it in the database
     const verificationToken = getVerificationToken(newUser);
     await newUser.save();
+
+    // Assign free credits to new user
+    try {
+      await CreditService.assignFreeCredits(newUser._id.toString());
+    } catch (error) {
+      console.error("Error assigning free credits:", error);
+      // Don't fail registration if credit assignment fails
+    }
 
     const verificationLink = `${process.env.NEXT_PUBLIC_BASE_URL}/api/verify-email?verifyToken=${verificationToken}&id=${newUser?._id}`;
     const message = verificationEmailTemplate(verificationLink);

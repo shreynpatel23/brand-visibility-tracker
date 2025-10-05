@@ -16,6 +16,11 @@ export interface IUser {
     plan_id: string;
     plan_name: string;
   };
+  // Credit system fields
+  credits_balance?: number;
+  total_credits_purchased?: number;
+  total_credits_used?: number;
+  stripe_customer_id?: string;
 }
 
 // Authentication API responses

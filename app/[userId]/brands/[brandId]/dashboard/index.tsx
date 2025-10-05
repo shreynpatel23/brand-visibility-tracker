@@ -26,6 +26,8 @@ import { fetchData } from "@/utils/fetch";
 import Loading from "@/components/loading";
 import FunnelHeatmap from "@/components/funnel-heatmap";
 import { models, periods, stages } from "@/constants/dashboard";
+import { Button } from "@/components/ui/button";
+// import { CreditBalance } from "@/components/credit-balance";
 
 const DashboardPage = ({
   userId,
@@ -89,12 +91,13 @@ const DashboardPage = ({
               Error Loading Dashboard
             </h3>
             <p className="text-red-600 dark:text-red-400 mt-2">{error}</p>
-            <button
+            <Button
+              variant="destructive"
               onClick={() => window.location.reload()}
-              className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              className="mt-3"
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -466,6 +469,15 @@ const DashboardPage = ({
           Add Brand
         </Link>
       </div>
+
+      {/* Credit Balance */}
+      {/*         <div className="flex items-center gap-4">
+          <CreditBalance 
+            userId={userId} 
+            compact={false}
+            purchaseUrl={`/${userId}/brands/${brandId}/credits/purchase`}
+          />
+        </div> */}
 
       {/* Brand Info Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">

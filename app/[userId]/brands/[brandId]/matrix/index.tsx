@@ -31,6 +31,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
+import { Button } from "@/components/ui/button";
 
 const MatrixPage = ({
   userId,
@@ -103,12 +104,13 @@ const MatrixPage = ({
               Error Loading Matrix
             </h3>
             <p className="text-red-600 dark:text-red-400 mt-2">{error}</p>
-            <button
+            <Button
+              variant="destructive"
               onClick={() => window.location.reload()}
-              className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              className="mt-3"
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>

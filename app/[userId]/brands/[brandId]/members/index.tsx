@@ -12,8 +12,10 @@ import {
   Trash2,
   AlertTriangle,
   Search,
+  Filter,
+  User,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +47,7 @@ export default function MembersPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -59,6 +62,24 @@ export default function MembersPage({
 
   // Team members data from API
   const [teamMembers, setTeamMembers] = useState<BrandMember[]>([]);
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Handle search input change
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    // If search is cleared, immediately update debounced term
+    if (value === "") {
+      setDebouncedSearchTerm("");
+    }
+  }, []);
 
   // Get current user's role and member info
   const currentUser = teamMembers.find((member) => member.userId === userId);
@@ -208,8 +229,11 @@ export default function MembersPage({
 
   const filteredUsers = teamMembers.filter((user: BrandMember) => {
     const matchesSearch =
-      user?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      !debouncedSearchTerm ||
+      user?.fullName
+        ?.toLowerCase()
+        .includes(debouncedSearchTerm.toLowerCase()) ||
+      user?.email?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     const matchesRole =
       roleFilter === "all" ||
       user.role.toLowerCase() === roleFilter.toLowerCase();
@@ -323,41 +347,65 @@ export default function MembersPage({
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+        <div className="flex items-center space-x-4 w-full">
+          <Filter className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center space-x-4 w-full">
+            <div className="w-[40%]">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Search Users
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className={`pl-10 ${
+                    searchTerm !== debouncedSearchTerm
+                      ? "border-blue-300 dark:border-blue-600"
+                      : ""
+                  }`}
+                />
+                {searchTerm !== debouncedSearchTerm && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="Owner">Owner</SelectItem>
-                <SelectItem value="Admin">Admin</SelectItem>
-                <SelectItem value="Viewer">Viewer</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Role
+              </label>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="Owner">Owner</SelectItem>
+                  <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
@@ -525,8 +573,15 @@ export default function MembersPage({
                       colSpan={7}
                       className="text-center pt-8 pb-4 leading-relaxed"
                     >
-                      No team members found, <br /> try adjusting your filters
-                      to see more results.
+                      <div className="text-center py-12">
+                        <User className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                          No team members found
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          Try adjusting your filters to see more results.
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -628,14 +683,13 @@ export default function MembersPage({
               Cancel
             </Button>
             <Button
-              variant="destructive"
+              variant={isDeleting ? "outline" : "destructive"}
               onClick={handleDeleteMember}
               disabled={isDeleting}
             >
               {isDeleting ? (
                 <>
-                  <Loading message="" />
-                  <span className="ml-2">Removing...</span>
+                  <Loading message="Removing member..." />
                 </>
               ) : (
                 <>

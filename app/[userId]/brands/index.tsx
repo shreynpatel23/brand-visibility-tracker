@@ -144,18 +144,6 @@ const BrandListContent = ({ userId }: { userId: string }) => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  // const getStatusColor = (status: string) => {
-  //   return status === "active"
-  //     ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-  //     : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-  // };
-
-  // const getScoreColor = (score: number) => {
-  //   if (score >= 80) return "text-green-600 dark:text-green-400";
-  //   if (score >= 60) return "text-yellow-600 dark:text-yellow-400";
-  //   return "text-red-600 dark:text-red-400";
-  // };
-
   function ActionMenu({ brand }: { brand: IBrand }) {
     return (
       <DropdownMenu>
@@ -485,7 +473,7 @@ const BrandListContent = ({ userId }: { userId: string }) => {
                     value={selectedPeriod}
                     onValueChange={setSelectedPeriod}
                   >
-                    <SelectTrigger className="w-24">
+                    <SelectTrigger className="w-[100px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -503,7 +491,7 @@ const BrandListContent = ({ userId }: { userId: string }) => {
                     className={`px-3 py-2 text-sm font-medium ${
                       viewMode === "card"
                         ? "bg-accent/5 dark:bg-accent/5 text-accent dark:text-accent"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                        : "text-gray-500 dark:text-gray-200 hover:text-gray-700 dark:hover:text-gray-200"
                     } transition-colors`}
                   >
                     Cards
@@ -513,7 +501,7 @@ const BrandListContent = ({ userId }: { userId: string }) => {
                     className={`px-3 py-2 text-sm font-medium border-l border-gray-300 dark:border-gray-600 ${
                       viewMode === "table"
                         ? "bg-accent/5 dark:bg-accent/5 text-accent dark:text-accent"
-                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                        : "text-gray-500 dark:text-gray-200 hover:text-gray-700 dark:hover:text-gray-200"
                     } transition-colors`}
                   >
                     Table
@@ -589,9 +577,9 @@ const BrandListContent = ({ userId }: { userId: string }) => {
               Cancel
             </Button>
             <Button
-              variant="destructive"
               onClick={handleDeleteBrand}
               disabled={deleting}
+              variant={deleting ? "outline" : "destructive"}
             >
               {deleting ? (
                 <Loading message="Deleting brand..." />

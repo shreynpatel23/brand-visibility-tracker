@@ -11,6 +11,8 @@ import {
   Building2,
   Settings,
   UserCircle,
+  CreditCard,
+  History,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +37,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import Loading from "@/components/loading";
 import { toast } from "sonner";
+import { CreditBalance } from "@/components/credit-balance";
 
 interface BrandLayoutProps {
   children: React.ReactNode;
@@ -117,6 +120,19 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
     },
   ];
 
+  const creditItems = [
+    {
+      title: "Purchase Credits",
+      url: `/${userId}/brands/${brandId}/credits/purchase`,
+      icon: CreditCard,
+    },
+    {
+      title: "Transaction History",
+      url: `/${userId}/brands/${brandId}/transactions`,
+      icon: History,
+    },
+  ];
+
   const settingsItems = [
     {
       title: "Brand Settings",
@@ -151,6 +167,28 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
             <SidebarGroupContent>
               <SidebarMenu>
                 {navigationItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.url}
+                      tooltip={item.title}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Credits</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {creditItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
@@ -230,6 +268,13 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
               <ApiError
                 message={error}
                 setMessage={(value) => setError(value)}
+              />
+            )}
+            {user._id && (
+              <CreditBalance
+                userId={user._id}
+                compact={true}
+                purchaseUrl={`/${userId}/brands/${brandId}/credits/purchase`}
               />
             )}
             <ModeToggle />

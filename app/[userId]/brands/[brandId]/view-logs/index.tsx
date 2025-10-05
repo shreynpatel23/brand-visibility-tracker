@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
   Clock,
@@ -10,6 +10,7 @@ import {
   FileText,
   Download,
   Play,
+  Filter,
 } from "lucide-react";
 import {
   Select,
@@ -21,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { LogsResponse } from "@/types/brand";
 import { useUserContext } from "@/context/userContext";
-import { fetchData, postData } from "@/utils/fetch";
+import { fetchData } from "@/utils/fetch";
 import Loading from "@/components/loading";
 import { models, periods, stages } from "@/constants/dashboard";
 import {
@@ -33,9 +34,16 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { toast } from "sonner";
 import AnalysisStartedModal from "@/components/analysis-started-modal";
 import { useMatrixRefresh } from "@/context/matrixContext";
+import { AnalysisModelSelector } from "@/components/analysis-model-selector";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export default function ViewLogs({
   userId,
@@ -47,6 +55,7 @@ export default function ViewLogs({
   const { user } = useUserContext();
   const refreshMatrixData = useMatrixRefresh();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedModel, setSelectedModel] = useState("all");
   const [selectedStage, setSelectedStage] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -54,12 +63,36 @@ export default function ViewLogs({
   const [logsData, setLogsData] = useState<LogsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [triggeringAnalysis, setTriggeringAnalysis] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [limit] = useState(10); // setLimit removed as not currently used
   const [sortBy, setSortBy] = useState("createdAt");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [showAnalysisSelectorModal, setShowAnalysisSelectorModal] =
+    useState(false);
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      // Reset to first page when search changes
+      if (searchTerm !== debouncedSearchTerm) {
+        setCurrentPage(1);
+      }
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, debouncedSearchTerm]);
+
+  // Handle search input change
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    // If search is cleared, immediately update debounced term
+    if (value === "") {
+      setDebouncedSearchTerm("");
+      setCurrentPage(1);
+    }
+  }, []);
 
   // Helper function to toggle row expansion
   const toggleRowExpansion = (logId: string) => {
@@ -88,7 +121,7 @@ export default function ViewLogs({
           model: selectedModel,
           stage: selectedStage,
           status: selectedStatus,
-          search: searchTerm,
+          search: debouncedSearchTerm,
           sortBy: sortBy,
           sortOrder: "desc",
         });
@@ -115,43 +148,15 @@ export default function ViewLogs({
     selectedModel,
     selectedStage,
     selectedStatus,
-    searchTerm,
+    debouncedSearchTerm,
     currentPage,
     limit,
     sortBy,
   ]);
 
-  // Trigger new analysis
-  const triggerAnalysis = async () => {
-    if (!userId || !brandId || !user._id) return;
-
-    try {
-      setTriggeringAnalysis(true);
-
-      const requestBody = {
-        userId: user._id,
-      };
-
-      await postData(`/api/brand/${brandId}/logs`, requestBody);
-
-      // Show the analysis started modal
-      setShowAnalysisModal(true);
-
-      // Refresh matrix data immediately since analysis has started
-      await refreshMatrixData();
-
-      // Refresh logs after a delay to potentially show any immediate updates
-      setTimeout(() => {
-        setCurrentPage(1); // Reset to first page
-        // This will trigger the useEffect to refresh data
-      }, 2000);
-    } catch (err) {
-      const errorMsg =
-        err instanceof Error ? err.message : "Failed to trigger analysis";
-      toast.error(`Error: ${errorMsg}`);
-    } finally {
-      setTriggeringAnalysis(false);
-    }
+  // Open analysis model selector modal
+  const triggerAnalysis = () => {
+    setShowAnalysisSelectorModal(true);
   };
 
   // Loading state
@@ -253,8 +258,12 @@ export default function ViewLogs({
 
   const filteredLogs = logs.filter((log) => {
     if (
-      searchTerm &&
-      !log.prompt.toLowerCase().includes(searchTerm.toLowerCase())
+      debouncedSearchTerm &&
+      !log.promptResults.some((prompt: any) =>
+        prompt.promptText
+          .toLowerCase()
+          .includes(debouncedSearchTerm.toLowerCase())
+      )
     ) {
       return false;
     }
@@ -280,11 +289,10 @@ export default function ViewLogs({
         <div className="flex items-center gap-3">
           <Button
             onClick={triggerAnalysis}
-            disabled={triggeringAnalysis}
             className="flex items-center gap-2 bg-primary hover:bg-primary/90"
           >
             <Play className="w-4 h-4" />
-            {triggeringAnalysis ? "Analyzing..." : "Trigger Analysis"}
+            Trigger Analysis
           </Button>
           <Button className="flex items-center gap-2" variant="outline">
             <Download className="w-4 h-4" />
@@ -295,102 +303,113 @@ export default function ViewLogs({
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-          <div className="lg:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Search Prompts
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search prompts..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 text-sm border border-input rounded-md bg-background text-foreground"
-              />
+        <div className="flex items-center space-x-4 w-full">
+          <Filter className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center space-x-4 w-full">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Search Prompts
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search prompts..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className={`pl-10 ${
+                    searchTerm !== debouncedSearchTerm
+                      ? "border-blue-300 dark:border-blue-600"
+                      : ""
+                  }`}
+                />
+                {searchTerm !== debouncedSearchTerm && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin h-3 w-3 border border-blue-500 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Model
-            </label>
-            <Select
-              value={selectedModel}
-              onValueChange={(value) => setSelectedModel(value)}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Models</SelectItem>
-                {models.map((model) => (
-                  <SelectItem key={model} value={model}>
-                    {model}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Stage
-            </label>
-            <Select
-              value={selectedStage}
-              onValueChange={(value) => setSelectedStage(value)}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                {stages.map((stage) => (
-                  <SelectItem key={stage} value={stage}>
-                    {stage}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Status
-            </label>
-            <Select
-              value={selectedStatus}
-              onValueChange={(value) => setSelectedStatus(value)}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="warning">Warning</SelectItem>
-                <SelectItem value="error">Error</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Period
-            </label>
-            <Select
-              value={dateRange}
-              onValueChange={(value) => setDateRange(value)}
-            >
-              <SelectTrigger className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map(({ label, value }) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Model
+              </label>
+              <Select
+                value={selectedModel}
+                onValueChange={(value) => setSelectedModel(value)}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Models</SelectItem>
+                  {models.map((model) => (
+                    <SelectItem key={model} value={model}>
+                      {model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Stage
+              </label>
+              <Select
+                value={selectedStage}
+                onValueChange={(value) => setSelectedStage(value)}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stages</SelectItem>
+                  {stages.map((stage) => (
+                    <SelectItem key={stage} value={stage}>
+                      {stage}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+              <Select
+                value={selectedStatus}
+                onValueChange={(value) => setSelectedStatus(value)}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="success">Success</SelectItem>
+                  <SelectItem value="warning">Warning</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Period
+              </label>
+              <Select
+                value={dateRange}
+                onValueChange={(value) => setDateRange(value)}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {periods.map(({ label, value }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
@@ -689,6 +708,33 @@ export default function ViewLogs({
           )}
         </div>
       </div>
+
+      {/* Analysis Model Selector Modal */}
+      <Dialog
+        open={showAnalysisSelectorModal}
+        onOpenChange={setShowAnalysisSelectorModal}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Configure Analysis</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <AnalysisModelSelector
+              userId={userId}
+              brandId={brandId}
+              onAnalysisStart={(data) => {
+                setShowAnalysisSelectorModal(false);
+                setShowAnalysisModal(true);
+                // Refresh matrix data and logs after analysis starts
+                refreshMatrixData();
+                setTimeout(() => {
+                  setCurrentPage(1);
+                }, 2000);
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Analysis Started Modal */}
       <AnalysisStartedModal

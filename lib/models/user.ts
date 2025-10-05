@@ -42,6 +42,21 @@ const UserSchema = new Schema<IUser>(
       type: Schema.Types.ObjectId,
       ref: "Plan",
     },
+    credits_balance: {
+      type: Number,
+      default: 0,
+    },
+    total_credits_purchased: {
+      type: Number,
+      default: 0,
+    },
+    total_credits_used: {
+      type: Number,
+      default: 0,
+    },
+    stripe_customer_id: {
+      type: String,
+    },
   },
   {
     timestamps: true,
