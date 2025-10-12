@@ -38,10 +38,6 @@ const UserSchema = new Schema<IUser>(
       type: String,
       default: null,
     },
-    plan_id: {
-      type: Schema.Types.ObjectId,
-      ref: "Plan",
-    },
     credits_balance: {
       type: Number,
       default: 0,

@@ -7,7 +7,6 @@ import User from "@/lib/models/user";
 import { IUser } from "@/types/auth";
 import { cookies } from "next/headers";
 import { sendEmail } from "@/utils/sendEmail";
-import Plan from "@/lib/models/plan";
 import { verificationEmailTemplate } from "@/utils/verificationEmailTempelate";
 import { Types } from "mongoose";
 import { VERIFY_EMAIL } from "@/constants/onboarding-constants";
@@ -49,20 +48,12 @@ export const POST = async (request: Request) => {
       );
     }
 
-    // fetch all plans
-    const plans = await Plan.find();
-
-    const freePlan: any = plans.filter(
-      (plan) => plan.plan_id === PlanTypes.STARTER.toLowerCase()
-    );
-
     // create the new user object
     const newUser = new User({
       full_name,
       email,
       password: hashedPassword,
       number_of_retries: 0,
-      plan_id: new Types.ObjectId(freePlan?.[0]?._id),
       current_onboarding_step: VERIFY_EMAIL,
     });
 

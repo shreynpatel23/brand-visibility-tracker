@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import connect from "@/lib/db";
 import User from "@/lib/models/user";
-import Plan from "@/lib/models/plan";
 import Brand from "@/lib/models/brand";
 import { Membership } from "@/lib/models/membership";
 import { ObjectIdString, RoleSchema, StatusSchema } from "@/utils/mongoose";
@@ -171,11 +170,6 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-
-  // fetch all plans
-  await Plan.find();
-  // TODO: all a plan check later such that only paid users can create brands
-  // TODO: checks if the user is allowed to create a brand based on their plan
 
   // create the brand
   const newBrand = new Brand({

@@ -35,8 +35,8 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import AnalysisStartedModal from "@/components/analysis-started-modal";
-import { useMatrixRefresh } from "@/context/matrixContext";
 import { AnalysisModelSelector } from "@/components/analysis-model-selector";
+import { useAnalysisStatus } from "@/hooks/use-analysis-status";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +53,9 @@ export default function ViewLogs({
   brandId: string;
 }) {
   const { user } = useUserContext();
-  const refreshMatrixData = useMatrixRefresh();
+
+  // Check analysis status
+  const { isRunning, refetch } = useAnalysisStatus(userId, brandId);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedModel, setSelectedModel] = useState("all");
@@ -289,14 +291,24 @@ export default function ViewLogs({
         <div className="flex items-center gap-3">
           <Button
             onClick={triggerAnalysis}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+            disabled={isRunning}
+            className={`flex items-center gap-2 ${
+              isRunning
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-primary hover:bg-primary/90"
+            }`}
           >
-            <Play className="w-4 h-4" />
-            Trigger Analysis
-          </Button>
-          <Button className="flex items-center gap-2" variant="outline">
-            <Download className="w-4 h-4" />
-            Export Logs
+            {isRunning ? (
+              <>
+                <Clock className="w-4 h-4 animate-pulse" />
+                Analysis Running...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                Trigger Analysis
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -725,11 +737,10 @@ export default function ViewLogs({
               onAnalysisStart={() => {
                 setShowAnalysisSelectorModal(false);
                 setShowAnalysisModal(true);
-                // Refresh matrix data and logs after analysis starts
-                refreshMatrixData();
                 setTimeout(() => {
                   setCurrentPage(1);
                 }, 2000);
+                refetch();
               }}
             />
           </div>

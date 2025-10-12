@@ -3,6 +3,7 @@ import connect from "@/lib/db";
 import { Types } from "mongoose";
 import Brand from "@/lib/models/brand";
 import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
+import AnalysisStatus from "@/lib/models/analysisStatus";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 import { Membership } from "@/lib/models/membership";
 import { AIService } from "@/lib/services/aiService";
@@ -50,7 +51,8 @@ async function runAnalysisInBackground(
   brandId: string,
   userId: string,
   modelsToAnalyze: AIModel[],
-  stagesToAnalyze: AnalysisStage[]
+  stagesToAnalyze: AnalysisStage[],
+  analysisId: string
 ) {
   try {
     console.log(`Starting background analysis for brand ${brandId}`);
@@ -58,16 +60,48 @@ async function runAnalysisInBackground(
     // Re-establish database connection for background process
     await connect();
 
+    // Update analysis status to indicate processing has started
+    await AnalysisStatus.findOneAndUpdate(
+      { analysis_id: analysisId },
+      {
+        $set: {
+          "progress.current_task": "Connecting to AI services...",
+        },
+      }
+    );
+
     // Get brand and user details
     const brand = await Brand.findById(brandId);
     const user = await User.findById(userId);
 
     if (!brand || !user) {
       console.error("Brand or user not found for background analysis");
+      // Update status to failed
+      await AnalysisStatus.findOneAndUpdate(
+        { analysis_id: analysisId },
+        {
+          $set: {
+            status: "failed",
+            completed_at: new Date(),
+            error_message: "Brand or user not found",
+          },
+        }
+      );
       return;
     }
 
     const analysisStartTime = Date.now();
+
+    // Update status to indicate AI analysis has started
+    await AnalysisStatus.findOneAndUpdate(
+      { analysis_id: analysisId },
+      {
+        $set: {
+          "progress.current_task": "Running AI analysis...",
+        },
+      }
+    );
+
     const comprehensiveResults =
       await AIService.comprehensiveMultiPromptAnalysis(
         brand,
@@ -76,6 +110,18 @@ async function runAnalysisInBackground(
       );
 
     const analysisResults = [];
+    const totalTasks = modelsToAnalyze.length * stagesToAnalyze.length;
+    let completedTasks = 0;
+
+    // Update status to indicate processing results
+    await AnalysisStatus.findOneAndUpdate(
+      { analysis_id: analysisId },
+      {
+        $set: {
+          "progress.current_task": "Processing analysis results...",
+        },
+      }
+    );
 
     // Process and save each result
     for (const { model, stage, result } of comprehensiveResults) {
@@ -121,10 +167,33 @@ async function runAnalysisInBackground(
             aggregatedSentiment: organizedData.sentiment_analysis,
           },
         });
+
+        // Update progress
+        completedTasks++;
+        await AnalysisStatus.findOneAndUpdate(
+          { analysis_id: analysisId },
+          {
+            $set: {
+              "progress.completed_tasks": completedTasks,
+              "progress.current_task": `Processed ${model}-${stage} (${completedTasks}/${totalTasks})`,
+            },
+          }
+        );
       } catch (saveError) {
         console.error(
           `Error processing analysis for ${model}-${stage}:`,
           saveError
+        );
+        // Still update progress even if this task failed
+        completedTasks++;
+        await AnalysisStatus.findOneAndUpdate(
+          { analysis_id: analysisId },
+          {
+            $set: {
+              "progress.completed_tasks": completedTasks,
+              "progress.current_task": `Error in ${model}-${stage} (${completedTasks}/${totalTasks})`,
+            },
+          }
         );
       }
     }
@@ -143,6 +212,18 @@ async function runAnalysisInBackground(
         ? analysisResults.reduce((sum, r) => sum + r.result.weightedScore, 0) /
           analysisResults.length
         : 0;
+
+    // Update analysis status to completed
+    await AnalysisStatus.findOneAndUpdate(
+      { analysis_id: analysisId },
+      {
+        $set: {
+          status: "completed",
+          completed_at: new Date(),
+          "progress.current_task": "Analysis completed successfully!",
+        },
+      }
+    );
 
     // Send completion email
     const dashboardLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${userId}/brands/${brandId}/dashboard`;
@@ -164,6 +245,24 @@ async function runAnalysisInBackground(
     );
   } catch (error) {
     console.error("Background analysis error:", error);
+
+    // Update analysis status to failed
+    try {
+      await AnalysisStatus.findOneAndUpdate(
+        { analysis_id: analysisId },
+        {
+          $set: {
+            status: "failed",
+            completed_at: new Date(),
+            error_message:
+              error instanceof Error ? error.message : "Unknown error",
+            "progress.current_task": "Analysis failed",
+          },
+        }
+      );
+    } catch (statusUpdateError) {
+      console.error("Failed to update analysis status:", statusUpdateError);
+    }
 
     // Try to send error notification email
     try {
@@ -641,6 +740,28 @@ export const POST = async (
       );
     }
 
+    // Check if there's already a running analysis for this brand
+    const runningAnalysis = await AnalysisStatus.findOne({
+      brand_id: brandId,
+      status: "running",
+    });
+
+    if (runningAnalysis) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Analysis is already running for this brand!",
+          data: {
+            currentAnalysisId: runningAnalysis.analysis_id,
+            startedAt: runningAnalysis.started_at,
+            models: runningAnalysis.models,
+            stages: runningAnalysis.stages,
+            progress: runningAnalysis.progress,
+          },
+        }),
+        { status: 409 } // Conflict
+      );
+    }
+
     // Default to all models and stages if not specified
     const modelsToAnalyze: AIModel[] = models || [
       "ChatGPT",
@@ -690,6 +811,23 @@ export const POST = async (
     // Generate analysis ID for tracking
     const analysisId = `multi-${brandId}-${Date.now()}`;
 
+    // Create analysis status record
+    const totalTasks = modelsToAnalyze.length * stagesToAnalyze.length;
+    await AnalysisStatus.create({
+      brand_id: brandId,
+      user_id: userId,
+      analysis_id: analysisId,
+      status: "running",
+      models: modelsToAnalyze,
+      stages: stagesToAnalyze,
+      started_at: new Date(),
+      progress: {
+        total_tasks: totalTasks,
+        completed_tasks: 0,
+        current_task: "Initializing analysis...",
+      },
+    });
+
     // Deduct credits before starting analysis
     try {
       await CreditService.deductCredits(
@@ -719,7 +857,8 @@ export const POST = async (
         brandId,
         userId,
         modelsToAnalyze,
-        stagesToAnalyze
+        stagesToAnalyze,
+        analysisId
       );
     });
 

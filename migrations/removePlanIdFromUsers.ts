@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import Plan from "../lib/models/plan";
+import User from "../lib/models/user";
 dotenv.config({ path: ".env.local" });
 
 const DB_URL = process.env.DB_URL;
@@ -17,14 +17,17 @@ async function migrate() {
 
   console.log("Connected to MongoDB");
 
-  const result = await Plan.updateMany(
-    { plan_id: { $in: ["starter", "professional", "enterprise"] } },
-    {
-      $set: {
-        credits_included: 0,
-        is_credit_based: true,
-      },
-    }
+  // Find users that still have plan_id field
+  const usersWithPlanId = await User.countDocuments({
+    plan_id: { $exists: true },
+  });
+  console.log(`Found ${usersWithPlanId} users with plan_id field`);
+
+  // Remove plan_id field from all users that have it
+  const result = await User.updateMany(
+    { plan_id: { $exists: true } },
+    { $unset: { plan_id: "" } },
+    { strict: false }
   );
 
   console.log(`Migration complete: ${result.modifiedCount} documents updated`);
