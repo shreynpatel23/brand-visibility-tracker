@@ -674,7 +674,7 @@ export default function ViewLogs({
                     />
                   </PaginationItem>
 
-                  {generatePageNumbers().map((pageNumber, index) => (
+                  {generatePageNumbers().map((pageNumber) => (
                     <PaginationItem key={pageNumber}>
                       <PaginationLink
                         onClick={() => handlePageChange(pageNumber)}
@@ -722,7 +722,7 @@ export default function ViewLogs({
             <AnalysisModelSelector
               userId={userId}
               brandId={brandId}
-              onAnalysisStart={(data) => {
+              onAnalysisStart={() => {
                 setShowAnalysisSelectorModal(false);
                 setShowAnalysisModal(true);
                 // Refresh matrix data and logs after analysis starts

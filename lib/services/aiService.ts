@@ -80,7 +80,8 @@ Please ensure all numerical values are clearly specified and percentages add up 
         mentionPosition: Math.min(Math.max(parsed.mentionPosition ?? 0, 0), 5),
         analysis: parsed.analysis ?? "No analysis provided",
       };
-    } catch (err) {
+    } catch (error) {
+      console.log("Error parsing AI response:", error);
       // Extract score
       const scoreMatch = response.match(/SCORE:\s*(\d+)/i);
       const score = scoreMatch
@@ -663,7 +664,7 @@ Please ensure all numerical values are clearly specified and percentages add up 
 
       // Calculate aggregated sentiment
       const totalSentimentResponses = successfulPrompts;
-      let aggregatedSentiment: {
+      const aggregatedSentiment: {
         overall: "positive" | "neutral" | "negative";
         confidence: number;
         distribution: {

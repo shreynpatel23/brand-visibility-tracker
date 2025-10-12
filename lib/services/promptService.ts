@@ -48,7 +48,6 @@ export class PromptService {
       const csvContent = await fs.readFile(csvFilePath, "utf-8");
 
       const lines = csvContent.trim().split("\n");
-      const headers = lines[0].split(",");
 
       this.prompts = lines
         .slice(1)

@@ -88,7 +88,7 @@ const EmailVerificationPage: React.FC = () => {
             Check your email
           </h2>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            We've sent a verification link to
+            We&apos;ve sent a verification link to
           </p>
           <p className="font-medium text-gray-900 dark:text-white">{email}</p>
         </div>
@@ -103,7 +103,7 @@ const EmailVerificationPage: React.FC = () => {
               <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                 <p>
                   Click the verification link in your email to activate your
-                  account. If you don't see it, check your spam folder.
+                  account. If you don&apos;t see it, check your spam folder.
                 </p>
               </div>
             </div>
@@ -129,7 +129,7 @@ const EmailVerificationPage: React.FC = () => {
         <div className="space-y-4">
           <div className="text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Didn't receive the email?
+              Didn&apos;t receive the email?
             </p>
             <Button
               variant="outline"

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { StripeService } from "@/lib/services/stripeService";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Return available credit packages
     const packages = StripeService.CREDIT_PACKAGES.map((pkg) => ({

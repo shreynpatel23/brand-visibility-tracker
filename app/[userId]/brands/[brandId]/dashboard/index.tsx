@@ -239,7 +239,7 @@ const DashboardPage = ({
           </span>
         </div>
         <div className="space-y-4">
-          {stages.map((stage, index) => (
+          {stages.map((stage) => (
             <div key={stage} className="flex items-center">
               <div className="w-20 text-sm font-medium text-gray-600 dark:text-gray-400">
                 <div>{stage}</div>
@@ -399,47 +399,71 @@ const DashboardPage = ({
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
         Weekly Performance Trend
       </h3>
-      <div className="space-y-4">
-        <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
-          <span>Score Trend</span>
-          <span>Prompt Volume</span>
+      <div className="space-y-4 w-full">
+        <div className="flex items-center w-full">
+          <div className="w-[70%]">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Score Trend
+            </p>
+          </div>
+          <div className="w-[15%]">
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+              Prompt
+            </p>
+          </div>
+          <div className="w-[15%]">
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+              Volume
+            </p>
+          </div>
         </div>
         {data.labels.map((label: string, index: number) => (
-          <div key={label} className="flex items-center justify-between">
-            <div className="w-12 text-sm font-medium text-gray-600 dark:text-gray-400">
-              {label}
-            </div>
-            <div className="flex-1 mx-4 flex items-center">
-              <div className="w-1/2 pr-2">
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${getScoreColor(
-                      data.scores[index]
-                    )}`}
-                    style={{ width: `${data.scores[index]}%` }}
-                  />
+          <div key={label} className="flex items-center w-full">
+            <div className="w-[70%]">
+              <div className="flex items-center gap-1">
+                <div className="w-12 text-sm font-medium text-gray-600 dark:text-gray-400">
+                  {label}
+                </div>
+                <div className="flex-1 mx-4 flex items-center">
+                  <div className="w-1/2 pr-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${getScoreColor(
+                          data.scores[index]
+                        )}`}
+                        style={{ width: `${data.scores[index]}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="w-1/2 pl-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div
+                        className="h-2 rounded-full bg-blue-500"
+                        style={{
+                          width: `${
+                            (data.prompts[index] / Math.max(...data.prompts)) *
+                            100
+                          }%`,
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="w-1/2 pl-2">
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full bg-blue-500"
-                    style={{
-                      width: `${
-                        (data.prompts[index] / Math.max(...data.prompts)) * 100
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
             </div>
-            <div className="flex space-x-4 text-sm">
-              <span className={getScoreTextColor(data.scores[index])}>
+            <div className="w-[15%]">
+              <p
+                className={`text-sm ${getScoreTextColor(
+                  data.scores[index]
+                )} text-center`}
+              >
                 {data.scores[index]}%
-              </span>
-              <span className="text-blue-600 dark:text-blue-400">
+              </p>
+            </div>
+            <div className="w-[15%]">
+              <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
                 {data.prompts[index]}
-              </span>
+              </p>
             </div>
           </div>
         ))}
@@ -469,15 +493,6 @@ const DashboardPage = ({
           Add Brand
         </Link>
       </div>
-
-      {/* Credit Balance */}
-      {/*         <div className="flex items-center gap-4">
-          <CreditBalance 
-            userId={userId} 
-            compact={false}
-            purchaseUrl={`/${userId}/brands/${brandId}/credits/purchase`}
-          />
-        </div> */}
 
       {/* Brand Info Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -596,21 +611,16 @@ const DashboardPage = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Total Analyses"
-          value={
-            (dashboardData.currentPeriodMetrics as any).totalAnalyses ||
-            dashboardData.currentPeriodMetrics.totalPrompts
-          }
+          value={dashboardData.currentPeriodMetrics.totalAnalyses}
           subtitle={`${
-            (dashboardData.currentPeriodMetrics as any).totalPrompts || "N/A"
+            dashboardData.currentPeriodMetrics.totalPrompts || "N/A"
           } prompts processed`}
           icon={<BarChart3 className="w-5 h-5 text-primary" />}
         />
         <MetricCard
           title="Weighted Score"
           value={`${Math.round(
-            (dashboardData.currentPeriodMetrics as any).avgWeightedScore ||
-              (selectedBrand.metrics as any).avgScore ||
-              0
+            dashboardData.currentPeriodMetrics.avgWeightedScore || 0
           )}%`}
           subtitle="Position-weighted metric"
           icon={<TrendingUp className="w-5 h-5 text-primary" />}
@@ -622,21 +632,21 @@ const DashboardPage = ({
         <MetricCard
           title="Overall Score"
           value={`${Math.round(
-            (dashboardData.currentPeriodMetrics as any).avgOverallScore ||
-              (selectedBrand.metrics as any).avgScore ||
-              0
+            dashboardData.currentPeriodMetrics.avgOverallScore || 0
           )}%`}
           subtitle="Average across all prompts"
           icon={<Target className="w-5 h-5 text-primary" />}
         />
         <MetricCard
           title="Success Rate"
-          value={`${selectedBrand.metrics.successRate}%`}
+          value={`${dashboardData.currentPeriodMetrics.successRate}%`}
           icon={<Activity className="w-5 h-5 text-primary" />}
         />
         <MetricCard
           title="Response Time"
-          value={`${Math.round(selectedBrand.metrics.avgResponseTime / 1000)}s`}
+          value={`${Math.round(
+            dashboardData.currentPeriodMetrics.avgResponseTime / 1000
+          )}s`}
           subtitle="Average processing time"
           icon={<Activity className="w-5 h-5 text-primary" />}
         />

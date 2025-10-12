@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import connect from "@/lib/db";
-import { Types, connection } from "mongoose";
+import { Types } from "mongoose";
 import Brand from "@/lib/models/brand";
 import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
@@ -119,7 +119,6 @@ export const GET = async (
     const analysisFilter: any = {
       brand_id: new Types.ObjectId(brandId),
       createdAt: { $gte: startDate, $lte: endDate },
-      status: "success",
     };
 
     if (model !== "all") {
@@ -159,16 +158,40 @@ export const GET = async (
       },
     ];
 
+    // Get total count of aggregated results (without pagination)
+    const totalCountAggregation = [
+      ...matrixAggregation,
+      {
+        $count: "total",
+      },
+    ];
+
+    // Add pagination to the main aggregation
+    const paginatedMatrixAggregation = [
+      ...matrixAggregation,
+      {
+        $skip: (pageNum - 1) * limitNum,
+      },
+      {
+        $limit: limitNum,
+      },
+    ];
+
     // Check if any MultiPromptAnalysis data exists for this brand
     const totalMultiPromptAnalysisCount =
       await MultiPromptAnalysis.countDocuments({
         brand_id: new Types.ObjectId(brandId),
       });
 
-    const [matrixResults, totalCount] = await Promise.all([
-      MultiPromptAnalysis.aggregate(matrixAggregation as any[]).exec(),
-      MultiPromptAnalysis.countDocuments(analysisFilter),
+    console.log("totalMultiPromptAnalysisCount", totalMultiPromptAnalysisCount);
+
+    const [matrixResults, totalCountResult] = await Promise.all([
+      MultiPromptAnalysis.aggregate(paginatedMatrixAggregation as any[]).exec(),
+      MultiPromptAnalysis.aggregate(totalCountAggregation as any[]).exec(),
     ]);
+
+    const totalCount =
+      totalCountResult.length > 0 ? totalCountResult[0].total : 0;
 
     // If no MultiPromptAnalysis data found, return empty response
     if (matrixResults.length === 0) {
@@ -177,7 +200,7 @@ export const GET = async (
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total: 0,
+          total: totalCount,
           hasMore: false,
         },
         summary: {
@@ -337,8 +360,8 @@ export const GET = async (
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total: matrixData.length,
-        hasMore: false, // Matrix view doesn't need pagination typically
+        total: totalCount,
+        hasMore: pageNum * limitNum < totalCount,
       },
       summary: {
         totalAnalyses,

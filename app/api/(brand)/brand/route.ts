@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
   }
 
   // fetch all plans
-  const plans = await Plan.find();
+  await Plan.find();
   // TODO: all a plan check later such that only paid users can create brands
   // TODO: checks if the user is allowed to create a brand based on their plan
 

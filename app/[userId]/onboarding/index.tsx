@@ -25,7 +25,7 @@ export default function OnboardingPage({ userId }: { userId: string }) {
             Welcome to Brand Visibility Tracker
           </h1>
           <p className="mt-2 text-lg text-gray-600 dark:text-gray-400">
-            Let's get you set up in just a few steps
+            Let&apos;s get you set up in just a few steps
           </p>
         </div>
 

@@ -8,13 +8,13 @@ import connect from "@/lib/db";
 import User from "@/lib/models/user";
 import { Invite } from "@/lib/models/invite";
 import { IInvite } from "@/types/membership";
-import { RouteParams, BrandParams } from "@/types/api";
 import { inviteMemberEmailTemplate } from "@/utils/inviteMemberEmailTempelate";
 import { sendEmail } from "@/utils/sendEmail";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 
 // Update: email is now an array of strings
 const MultiInviteBody = z.object({
+  brandId: z.string(),
   user_id: ObjectIdString,
   emails: z
     .array(
@@ -55,40 +55,7 @@ function getVerificationToken(invite: IInvite, ttlHours: number): string {
   return verificationToken;
 }
 
-// list pending invites for UI
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { brandId: string } }
-) {
-  await connect();
-  const { brandId } = await params;
-  const invites = await Invite.find({
-    brand_id: brandId,
-    status: "pending",
-    verify_token_expire: { $gt: new Date() }, // Only non-expired invites
-  })
-    .select("_id email role verify_token_expire invited_by createdAt")
-    .lean();
-
-  return new NextResponse(
-    JSON.stringify({
-      data: invites.map((i) => ({
-        id: String(i._id),
-        email: i.email,
-        role: i.role,
-        expires_at: i.verify_token_expire,
-        invited_by: i.invited_by,
-        created_at: i.createdAt,
-      })),
-    }),
-    { status: 200 }
-  );
-}
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { brandId: string } }
-) {
+export async function POST(request: NextRequest) {
   // Authenticate the request
   const authResult = await authMiddleware(request);
   if (!authResult.isValid) {
@@ -109,11 +76,8 @@ export async function POST(
     );
   }
 
-  const { user_id, emails } = parse.data;
+  const { user_id, emails, brandId } = parse.data;
   const ttlHours = parse.data.ttl_hours ?? 24 * 7; // 7 days
-
-  // extract the brandId from params
-  const { brandId } = await params;
 
   // connect to the database
   await connect();
@@ -247,18 +211,24 @@ export async function POST(
           status: "invited",
           message: "Invitation email has been sent!",
         });
-      } catch (emailErr) {
+      } catch (emailError) {
         results.push({
           email,
           status: "error",
-          message: "Failed to send invitation email.",
+          message:
+            emailError instanceof Error
+              ? emailError.message
+              : "Failed to send invitation email.",
         });
       }
     } catch (err) {
       results.push({
         email,
         status: "error",
-        message: "An error occurred while processing this invitation.",
+        message:
+          err instanceof Error
+            ? err.message
+            : "An error occurred while processing this invitation.",
       });
     }
   }
@@ -275,6 +245,7 @@ export async function POST(
 
 // Resend invite schema
 const ResendInviteBody = z.object({
+  brandId: z.string(),
   inviteId: ObjectIdString,
   user_id: ObjectIdString, // User requesting the resend
   ttl_hours: z
@@ -287,10 +258,7 @@ const ResendInviteBody = z.object({
 });
 
 // PATCH - Resend invite
-export const PATCH = async (
-  request: NextRequest,
-  context: { params: RouteParams<BrandParams> }
-) => {
+export const PATCH = async (request: NextRequest) => {
   try {
     // Authenticate the request
     const authResult = await authMiddleware(request);
@@ -312,11 +280,8 @@ export const PATCH = async (
         { status: 400 }
       );
     }
-    const { inviteId, user_id } = parse.data;
+    const { inviteId, user_id, brandId } = parse.data;
     const ttlHours = parse.data.ttl_hours ?? 24 * 7; // 7 days
-
-    // extract the brandId from params
-    const { brandId } = await context.params;
 
     // Connect to database
     await connect();

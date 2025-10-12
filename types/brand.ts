@@ -39,6 +39,7 @@ export interface DashboardBrand {
     };
   };
   metrics: {
+    avgScore: number;
     totalPrompts: number;
     avgResponseTime: number;
     successRate: number;
@@ -76,6 +77,8 @@ export interface MatrixData {
   model: string;
   stage: AnalysisStage;
   score: number;
+  weightedScore: number;
+  analyses: number;
   prompts: number;
   avgResponseTime: number;
   successRate: number;
@@ -148,7 +151,10 @@ export interface DashboardResponse {
     region?: string;
   };
   currentPeriodMetrics: {
+    totalAnalyses: number;
+    avgWeightedScore: number;
     totalPrompts: number;
+    avgOverallScore: number;
     avgScore: number;
     avgResponseTime: number;
     successRate: number;
@@ -200,8 +206,9 @@ export interface MatrixResponse {
     hasMore: boolean;
   };
   summary: {
+    totalPrompts: number;
     totalAnalyses: number;
-    avgScore: number;
+    avgWeightedScore: number;
     bestPerforming: {
       model: string;
       stage: string;

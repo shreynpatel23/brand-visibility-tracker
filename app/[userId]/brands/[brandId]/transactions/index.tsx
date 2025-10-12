@@ -41,7 +41,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 interface TransactionHistoryResponse {
@@ -152,7 +151,7 @@ export default function TransactionHistoryPage({
   }, []);
 
   const fetchTransactions = useCallback(
-    async (page: number, reset: boolean = false) => {
+    async (page: number) => {
       try {
         setLoading(true);
         // Build query parameters
@@ -201,7 +200,7 @@ export default function TransactionHistoryPage({
 
   useEffect(() => {
     if (user._id) {
-      fetchTransactions(1, true);
+      fetchTransactions(1);
     }
   }, [user._id, fetchTransactions]);
 
@@ -241,7 +240,7 @@ export default function TransactionHistoryPage({
   };
 
   const refresh = () => {
-    fetchTransactions(1, true);
+    fetchTransactions(1);
   };
 
   const clearFilters = () => {
@@ -251,10 +250,6 @@ export default function TransactionHistoryPage({
     setStartDate(undefined);
     setEndDate(undefined);
     setCurrentPage(1);
-    // Trigger refetch after clearing filters
-    setTimeout(() => {
-      fetchTransactions(1, true);
-    }, 0);
   };
 
   const hasActiveFilters = typeFilter !== "all" || startDate || endDate;
@@ -285,7 +280,7 @@ export default function TransactionHistoryPage({
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
-      fetchTransactions(page, true);
+      fetchTransactions(page);
     }
   };
   const generatePageNumbers = () => {
@@ -665,7 +660,7 @@ export default function TransactionHistoryPage({
                     />
                   </PaginationItem>
 
-                  {generatePageNumbers().map((pageNumber, index) => (
+                  {generatePageNumbers().map((pageNumber) => (
                     <PaginationItem key={pageNumber}>
                       <PaginationLink
                         onClick={() => handlePageChange(pageNumber)}

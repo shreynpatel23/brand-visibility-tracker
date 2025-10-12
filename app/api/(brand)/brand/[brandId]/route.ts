@@ -169,7 +169,7 @@ export const PUT = async (
 
     // Filter out undefined values from the update data
     const updateData = Object.fromEntries(
-      Object.entries(parse.data).filter(([_, value]) => value !== undefined)
+      Object.entries(parse.data).filter(([, value]) => value !== undefined)
     );
 
     // Update the brand

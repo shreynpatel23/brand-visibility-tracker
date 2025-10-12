@@ -185,7 +185,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-              Track Your Brand's
+              Track Your Brand&apos;s
               <span className="text-accent block">AI Visibility</span>
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
@@ -318,8 +318,8 @@ export default function Home() {
               Everything you need to track AI visibility
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Comprehensive tools to monitor, analyze, and optimize your brand's
-              presence across AI models.
+              Comprehensive tools to monitor, analyze, and optimize your
+              brand&apos;s presence across AI models.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -407,7 +407,7 @@ export default function Home() {
                   ))}
                 </div>
                 <p className="text-gray-600 dark:text-gray-300 mb-6 italic">
-                  "{testimonial.content}"
+                  &ldquo;{testimonial.content}&rdquo;
                 </p>
                 <div>
                   <div className="font-semibold text-gray-900 dark:text-white">
@@ -434,7 +434,7 @@ export default function Home() {
               Simple, transparent pricing
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300">
-              Choose the plan that's right for your business
+              Choose the plan that&apos;s right for your business
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -500,7 +500,7 @@ export default function Home() {
       <section className="py-24 bg-accent">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Ready to track your brand's AI visibility?
+            Ready to track your brand&apos;s AI visibility?
           </h2>
           <p className="text-xl text-gray-100 mb-8">
             Join hundreds of brands already using BrandViz to optimize their AI
@@ -529,8 +529,8 @@ export default function Home() {
                 <span className="ml-2 text-2xl font-bold">BrandViz</span>
               </div>
               <p className="text-gray-400 mb-4">
-                Track your brand's visibility across AI models and optimize your
-                digital presence.
+                Track your brand&apos;s visibility across AI models and optimize
+                your digital presence.
               </p>
               <div className="flex space-x-4">
                 <Globe className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer transition-colors" />

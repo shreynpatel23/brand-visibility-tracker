@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { CreditPurchase } from "@/components/credit-purchase";
 import { CreditBalance } from "@/components/credit-balance";
 import { useUserContext } from "@/context/userContext";
@@ -8,7 +8,6 @@ import Loading from "@/components/loading";
 
 export default function CreditPurchasePage() {
   const params = useParams();
-  const router = useRouter();
   const { userId, brandId } = params;
   const { user } = useUserContext();
 
@@ -45,11 +44,6 @@ export default function CreditPurchasePage() {
         userId={user._id}
         successUrl={`${window.location.origin}/${userId}/brands/${brandId}/credits/success`}
         cancelUrl={`${window.location.origin}/${userId}/brands/${brandId}/credits/cancel`}
-        onPurchaseSuccess={(data) => {
-          console.log("Purchase successful:", data);
-          // Redirect to success page within the brand context
-          router.push(`/${userId}/brands/${brandId}/credits/success`);
-        }}
         onPurchaseStart={() => {
           console.log("Purchase started");
         }}

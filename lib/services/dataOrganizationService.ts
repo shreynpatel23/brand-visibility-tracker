@@ -1,7 +1,5 @@
 import { Types } from "mongoose";
-import MultiPromptAnalysis, {
-  IMultiPromptAnalysis,
-} from "@/lib/models/multiPromptAnalysis";
+import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
 import { ScoringService, ScoringResult } from "./scoringService";
 import { PromptService } from "./promptService";
 import { AnalysisStage, AIModel } from "@/types/brand";
@@ -209,32 +207,6 @@ export class DataOrganizationService {
     data: OrganizedAnalysisData
   ): Promise<void> {
     try {
-      // Prepare data for validation
-      const dataForValidation = {
-        overall_score: data.overall_score,
-        weighted_score: data.weighted_score,
-        total_response_time: data.metadata.total_processing_time,
-        success_rate:
-          data.metadata.total_prompts > 0
-            ? (data.metadata.successful_prompts / data.metadata.total_prompts) *
-              100
-            : 0,
-        aggregated_sentiment: data.sentiment_analysis,
-        prompt_results: data.prompt_results.map((result) => ({
-          prompt_id: result.prompt_id,
-          prompt_text: result.prompt_text,
-          score: result.scoring_result.raw_score,
-          weighted_score: result.scoring_result.position_weighted_score,
-          mention_position: result.scoring_result.mention_position,
-          response: result.raw_response,
-          response_time: result.processing_time,
-          sentiment: data.sentiment_analysis,
-          status: result.status,
-        })),
-        metadata: data.metadata,
-        status: data.performance_level === "poor" ? "warning" : "success",
-      };
-
       // Inline validation and sanitization
       const sanitizedOverallScore = isNaN(data.overall_score)
         ? 0

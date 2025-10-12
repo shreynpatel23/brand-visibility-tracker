@@ -123,6 +123,7 @@ export default function MembersPage({
 
     try {
       await patchData(`/api/brand/${brandId}/invites`, {
+        brandId,
         inviteId: member.inviteId,
         user_id: userId,
       });

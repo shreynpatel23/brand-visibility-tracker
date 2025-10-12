@@ -126,6 +126,7 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
     setLoading(true);
     try {
       const response = await postData(`/api/brand/${brandId}/accept-invite`, {
+        brandId,
         invitedBy: inviteData?.invitedBy._id,
         verifyToken: token,
         email,

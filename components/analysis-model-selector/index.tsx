@@ -4,15 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import {
-  Bot,
-  Zap,
-  Clock,
-  CreditCard,
-  AlertCircle,
-  CheckCircle2,
-  Sparkles,
-} from "lucide-react";
+import { Bot, Zap, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { CreditBalance } from "@/components/credit-balance";
 import { postData } from "@/utils/fetch";

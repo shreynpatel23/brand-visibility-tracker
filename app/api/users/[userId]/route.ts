@@ -26,7 +26,7 @@ export const GET = async (
     await connect();
 
     // get user details from userID
-    let user = await User.findById(userId);
+    const user = await User.findById(userId);
 
     if (!user) {
       return new NextResponse(

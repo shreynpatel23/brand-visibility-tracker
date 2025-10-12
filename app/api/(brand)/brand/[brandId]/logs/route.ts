@@ -214,9 +214,6 @@ async function updateDailyMetrics(brandId: string) {
 
   // Calculate aggregated metrics using weighted scores
   const totalAnalyses = todaysAnalyses.length;
-  const avgScore =
-    todaysAnalyses.reduce((sum, item) => sum + item.overall_score, 0) /
-    totalAnalyses;
   const avgWeightedScore =
     todaysAnalyses.reduce((sum, item) => sum + item.weighted_score, 0) /
     totalAnalyses;

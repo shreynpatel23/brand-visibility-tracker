@@ -1,4 +1,4 @@
-import { PromptService, ProcessedPrompt } from "./promptService";
+import { ProcessedPrompt } from "./promptService";
 import { AnalysisStage } from "@/types/brand";
 
 export interface ScoringWeights {

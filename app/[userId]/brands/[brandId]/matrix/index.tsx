@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MatrixResponse } from "@/types/brand";
+import { MatrixData, MatrixResponse } from "@/types/brand";
 import { useUserContext } from "@/context/userContext";
 import { fetchData } from "@/utils/fetch";
 import Loading from "@/components/loading";
@@ -46,7 +46,7 @@ const MatrixPage = ({
   const [selectedStage, setSelectedStage] = useState("all");
   const [dateRange, setDateRange] = useState("7d");
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit] = useState(10);
   const [matrixData, setMatrixData] = useState<MatrixResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -62,8 +62,8 @@ const MatrixPage = ({
 
         const url = `/api/brand/${brandId}/matrix?userId=${userId}&period=${dateRange}&model=${selectedModel}&stage=${selectedStage}&page=${page.toString()}&limit=${limit.toString()}`;
         const response = await fetchData(url);
-
-        setMatrixData(response.data);
+        const { data } = response;
+        setMatrixData(data);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to fetch matrix data"
@@ -210,16 +210,6 @@ const MatrixPage = ({
     }
   };
 
-  // const filteredData = matrixItems.filter((item) => {
-  //   if (selectedModel !== "all" && item.model.toLowerCase() !== selectedModel) {
-  //     return false;
-  //   }
-  //   if (selectedStage !== "all" && item.stage !== selectedStage) {
-  //     return false;
-  //   }
-  //   return true;
-  // });
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -360,7 +350,7 @@ const MatrixPage = ({
                 </tr>
               </thead>
               <tbody>
-                {matrixItems.map((item, index) => (
+                {matrixItems.map((item: MatrixData, index) => (
                   <tr
                     key={`${item.model}-${item.stage}`}
                     className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
@@ -405,18 +395,15 @@ const MatrixPage = ({
                         <div className="flex items-center">
                           <div
                             className={`w-3 h-3 rounded-full mr-2 ${getScoreColor(
-                              (item as any).weightedScore || item.score
+                              item.weightedScore || item.score
                             )}`}
                           />
                           <span
                             className={`font-semibold ${getScoreTextColor(
-                              (item as any).weightedScore || item.score
+                              item.weightedScore || item.score
                             )}`}
                           >
-                            {Math.round(
-                              (item as any).weightedScore || item.score
-                            )}
-                            %
+                            {Math.round(item.weightedScore || item.score)}%
                           </span>
                         </div>
                       </div>
@@ -424,7 +411,7 @@ const MatrixPage = ({
                     <td className="py-4 px-4 text-center">
                       <div className="text-center">
                         <span className="text-gray-900 dark:text-white font-medium">
-                          {(item as any).analyses || "N/A"}
+                          {item.analyses || "N/A"}
                         </span>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           multi-prompt runs
@@ -571,7 +558,7 @@ const MatrixPage = ({
                 Total Prompts
               </h3>
               <p className="text-lg font-bold text-gray-900 dark:text-white">
-                {(matrixData.summary as any)?.totalPrompts ||
+                {matrixData.summary?.totalPrompts ||
                   matrixItems.reduce((sum, item) => sum + item.prompts, 0)}
               </p>
               <p className="text-sm text-purple-600 dark:text-purple-400">

@@ -1,7 +1,6 @@
-import { Types } from "mongoose";
 import User from "@/lib/models/user";
 import CreditTransaction from "@/lib/models/creditTransaction";
-import { AIModel, AnalysisStage } from "@/types/plans";
+import { AIModel } from "@/types/plans";
 
 export class CreditService {
   // Credit costs per model (for all stages)

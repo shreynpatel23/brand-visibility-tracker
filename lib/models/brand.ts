@@ -1,4 +1,4 @@
-import { Schema, Types, model, models } from "mongoose";
+import { Schema, model, models } from "mongoose";
 import { IBrand } from "@/types/brand";
 
 const BrandSchema = new Schema<IBrand>(

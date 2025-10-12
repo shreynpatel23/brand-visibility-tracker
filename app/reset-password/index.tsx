@@ -31,8 +31,8 @@ const ResetPasswordPage: React.FC = () => {
               Password reset successful
             </h2>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Your password has been updated. You'll be redirected to the login
-              page shortly.
+              Your password has been updated. You&apos;ll be redirected to the
+              login page shortly.
             </p>
           </div>
         </div>

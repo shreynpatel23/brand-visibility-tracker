@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { CreditCard, Coins, Star, Check, Zap, Gift } from "lucide-react";
 import { toast } from "sonner";
 import Loading from "../loading";
@@ -30,7 +29,6 @@ interface CreditPackage {
 
 interface CreditPurchaseProps {
   userId: string;
-  onPurchaseSuccess?: (packageData: any) => void;
   onPurchaseStart?: () => void;
   successUrl?: string;
   cancelUrl?: string;
@@ -38,7 +36,6 @@ interface CreditPurchaseProps {
 
 export function CreditPurchase({
   userId,
-  onPurchaseSuccess,
   onPurchaseStart,
   successUrl,
   cancelUrl,

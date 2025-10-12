@@ -55,6 +55,7 @@ export function InviteTeamMemberForm({
     setLoading(true);
     try {
       const response = await postData(`/api/brand/${brandId}/invites`, {
+        brandId,
         emails: teamMembers.map((member) => ({
           email: member.email.toLowerCase(),
           role: member.role.toLowerCase(),

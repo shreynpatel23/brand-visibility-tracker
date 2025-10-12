@@ -5,7 +5,6 @@ import Brand from "@/lib/models/brand";
 import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 import { Membership } from "@/lib/models/membership";
-import { DataOrganizationService } from "@/lib/services/dataOrganizationService";
 import { z } from "zod";
 import { RouteParams, BrandParams } from "@/types/api";
 

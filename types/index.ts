@@ -19,6 +19,9 @@ export * from "./api";
 // Plan & billing types
 export * from "./plans";
 
+// Explicit re-export to resolve ambiguity with AIModel, AnalysisStage
+export type { AIModel, AnalysisStage } from "./brand";
+
 // UI component types
 export * from "./ui";
 

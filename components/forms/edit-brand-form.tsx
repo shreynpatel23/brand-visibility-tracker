@@ -364,8 +364,9 @@ export function EditBrandForm({
           <DialogHeader>
             <DialogTitle>Delete Brand</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{brandName}"? This action cannot
-              be undone and will permanently remove all associated data.
+              Are you sure you want to delete &ldquo;{brandName}&rdquo;? This
+              action cannot be undone and will permanently remove all associated
+              data.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

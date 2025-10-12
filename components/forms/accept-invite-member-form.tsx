@@ -74,6 +74,7 @@ export function AcceptInviteMemberForm({
     try {
       const { name, email, password } = values;
       const response = await postData(`/api/brand/${brandId}/accept-invite`, {
+        brandId,
         invitedBy,
         verifyToken: token,
         email,

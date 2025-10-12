@@ -13,6 +13,7 @@ import { PlanTypes } from "@/types";
 import { CreditService } from "@/lib/services/creditService";
 
 const AcceptInviteBody = z.object({
+  brandId: z.string(),
   invitedBy: z.string(),
   verifyToken: z.string().min(10),
   email: z.string().email(),
@@ -28,10 +29,7 @@ function hashToken(token: string) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { brandId: string } }
-) {
+export async function POST(request: NextRequest) {
   // Parse and validate the request body
   const parse = AcceptInviteBody.safeParse(await request.json());
   if (!parse.success) {
@@ -48,7 +46,7 @@ export async function POST(
   await connect();
 
   // extract the brandId from params
-  const { brandId } = await params;
+  const { verifyToken, email, signup, invitedBy, brandId } = parse.data;
 
   // verify brand exists
   const brand = await Brand.findById(brandId);
@@ -58,8 +56,6 @@ export async function POST(
       { status: 400 }
     );
   }
-
-  const { verifyToken, email, signup, invitedBy } = parse.data;
   const now = new Date();
 
   // Find a live, pending invite by hashed token
