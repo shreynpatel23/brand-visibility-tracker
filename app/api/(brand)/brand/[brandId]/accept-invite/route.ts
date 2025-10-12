@@ -7,8 +7,6 @@ import User from "@/lib/models/user";
 import { Invite } from "@/lib/models/invite";
 import { Membership } from "@/lib/models/membership";
 import connect from "@/lib/db";
-import { Types } from "mongoose";
-import { PlanTypes } from "@/types";
 import { CreditService } from "@/lib/services/creditService";
 
 const AcceptInviteBody = z.object({

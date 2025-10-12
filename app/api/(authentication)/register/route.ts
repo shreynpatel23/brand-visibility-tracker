@@ -8,9 +8,7 @@ import { IUser } from "@/types/auth";
 import { cookies } from "next/headers";
 import { sendEmail } from "@/utils/sendEmail";
 import { verificationEmailTemplate } from "@/utils/verificationEmailTempelate";
-import { Types } from "mongoose";
 import { VERIFY_EMAIL } from "@/constants/onboarding-constants";
-import { PlanTypes } from "@/types";
 import { CreditService } from "@/lib/services/creditService";
 
 function getVerificationToken(user: IUser): string {

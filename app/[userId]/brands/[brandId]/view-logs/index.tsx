@@ -8,7 +8,6 @@ import {
   XCircle,
   AlertCircle,
   FileText,
-  Download,
   Play,
   Filter,
 } from "lucide-react";
