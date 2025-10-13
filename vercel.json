@@ -1,7 +1,7 @@
 {
   "functions": {
     "app/api/(brand)/brand/[brandId]/logs/route.ts": {
-      "maxDuration": 900
+      "maxDuration": 600
     }
   },
   "crons": [
