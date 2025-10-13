@@ -15,6 +15,7 @@ import User from "@/lib/models/user";
 import { sendEmail } from "@/utils/sendEmail";
 import { analysisCompletionEmailTemplate } from "@/utils/analysisCompletionEmailTemplate";
 import { CreditService } from "@/lib/services/creditService";
+import { AnalysisQueueService } from "@/lib/services/analysisQueueService";
 
 const LogsQuerySchema = z.object({
   userId: z.string().min(1, "User ID is required"),
@@ -851,15 +852,20 @@ export const POST = async (
     // Start analysis in background
     console.log(`Triggering background analysis for brand ${brand.name}`);
 
-    // Don't await - let it run in background
-    setImmediate(() => {
-      runAnalysisInBackground(
-        brandId,
-        userId,
-        modelsToAnalyze,
-        stagesToAnalyze,
-        analysisId
-      );
+    // For Vercel deployment, use the improved queue service
+    // This handles timeouts and interruptions more gracefully
+    const analysisJob = {
+      brandId,
+      userId,
+      models: modelsToAnalyze,
+      stages: stagesToAnalyze,
+      analysisId,
+    };
+
+    // Start the analysis job - don't await to avoid timeout
+    AnalysisQueueService.processAnalysisJob(analysisJob).catch((error) => {
+      console.error("Analysis job failed:", error);
+      // The cron job will pick up stuck analyses
     });
 
     // Return immediate response
