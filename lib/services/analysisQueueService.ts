@@ -29,15 +29,57 @@ export class AnalysisQueueService {
       // Re-establish database connection
       await connect();
 
-      // Update analysis status to indicate processing has started
-      await AnalysisStatus.findOneAndUpdate(
-        { analysis_id: analysisId },
+      // Check if analysis is already completed or being processed by another instance
+      const currentStatus = await AnalysisStatus.findOne({
+        analysis_id: analysisId,
+      });
+
+      if (!currentStatus) {
+        console.log(`Analysis ${analysisId} not found, skipping processing`);
+        return;
+      }
+
+      if (currentStatus.status !== "running") {
+        console.log(
+          `Analysis ${analysisId} is no longer running (status: ${currentStatus.status}), skipping processing`
+        );
+        return;
+      }
+
+      // Check if another instance is actively processing this analysis (updated within last 2 minutes)
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+      if (
+        currentStatus.updatedAt > twoMinutesAgo &&
+        currentStatus.progress?.current_task &&
+        !currentStatus.progress.current_task.startsWith("RESUMING:")
+      ) {
+        console.log(
+          `Analysis ${analysisId} appears to be actively processing by another instance, skipping`
+        );
+        return;
+      }
+
+      // Atomically claim this analysis for processing
+      const claimedAnalysis = await AnalysisStatus.findOneAndUpdate(
+        {
+          analysis_id: analysisId,
+          status: "running",
+        },
         {
           $set: {
             "progress.current_task": "Connecting to AI services...",
+            updatedAt: new Date(),
           },
-        }
+        },
+        { new: true }
       );
+
+      if (!claimedAnalysis) {
+        console.log(
+          `Could not claim analysis ${analysisId} for processing, skipping`
+        );
+        return;
+      }
 
       // Get brand and user details
       const brand = await Brand.findById(brandId);
@@ -60,16 +102,39 @@ export class AnalysisQueueService {
               `Processing ${model} - ${stage} for analysis ${analysisId}`
             );
 
-            // Update progress before starting each task
-            await AnalysisStatus.findOneAndUpdate(
-              { analysis_id: analysisId },
+            // Check if analysis is still running before processing each task
+            const statusCheck = await AnalysisStatus.findOne({
+              analysis_id: analysisId,
+            });
+            if (!statusCheck || statusCheck.status !== "running") {
+              console.log(
+                `Analysis ${analysisId} is no longer running, stopping processing`
+              );
+              return;
+            }
+
+            // Update progress before starting each task with atomic operation
+            const progressUpdate = await AnalysisStatus.findOneAndUpdate(
+              {
+                analysis_id: analysisId,
+                status: "running", // Only update if still running
+              },
               {
                 $set: {
                   "progress.current_task": `Analyzing ${model} - ${stage}...`,
                   "progress.completed_tasks": completedTasks,
+                  updatedAt: new Date(),
                 },
-              }
+              },
+              { new: true }
             );
+
+            if (!progressUpdate) {
+              console.log(
+                `Could not update progress for analysis ${analysisId}, stopping processing`
+              );
+              return;
+            }
 
             // Run analysis for this specific model-stage combination
             const result = await AIService.analyzeWithMultiplePrompts(
@@ -124,14 +189,18 @@ export class AnalysisQueueService {
               },
             });
 
-            // Update progress after completing each task
+            // Update progress after completing each task with atomic operation
             completedTasks++;
             await AnalysisStatus.findOneAndUpdate(
-              { analysis_id: analysisId },
+              {
+                analysis_id: analysisId,
+                status: "running", // Only update if still running
+              },
               {
                 $set: {
                   "progress.completed_tasks": completedTasks,
                   "progress.current_task": `Completed ${model}-${stage} (${completedTasks}/${totalTasks})`,
+                  updatedAt: new Date(),
                 },
               }
             );
@@ -148,11 +217,15 @@ export class AnalysisQueueService {
             // Still update progress even if this task failed
             completedTasks++;
             await AnalysisStatus.findOneAndUpdate(
-              { analysis_id: analysisId },
+              {
+                analysis_id: analysisId,
+                status: "running", // Only update if still running
+              },
               {
                 $set: {
                   "progress.completed_tasks": completedTasks,
                   "progress.current_task": `Error in ${model}-${stage} (${completedTasks}/${totalTasks})`,
+                  updatedAt: new Date(),
                 },
               }
             );
@@ -285,7 +358,7 @@ export class AnalysisQueueService {
   }
 
   /**
-   * Check for and resume stuck analyses
+   * Check for and resume stuck analyses with atomic locking to prevent duplicates
    */
   static async resumeStuckAnalyses(): Promise<number> {
     try {
@@ -293,27 +366,90 @@ export class AnalysisQueueService {
 
       // Find analyses that have been running for more than 10 minutes
       const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-      const stuckAnalyses = await AnalysisStatus.find({
-        status: "running",
-        started_at: { $lt: tenMinutesAgo },
-      }).limit(3); // Process max 3 at a time
+      const maxProcessingAttempts = 3; // Limit concurrent processing
+      let processedCount = 0;
 
-      console.log(`Found ${stuckAnalyses.length} stuck analyses to resume`);
+      console.log(
+        `Checking for stuck analyses older than ${tenMinutesAgo.toISOString()}`
+      );
 
-      for (const analysis of stuckAnalyses) {
-        const job: AnalysisJob = {
-          brandId: analysis.brand_id.toString(),
-          userId: analysis.user_id.toString(),
-          models: analysis.models,
-          stages: analysis.stages,
-          analysisId: analysis.analysis_id,
-        };
+      // Process stuck analyses one by one with atomic locking
+      for (let i = 0; i < maxProcessingAttempts; i++) {
+        // Use findOneAndUpdate to atomically claim a stuck analysis
+        // This prevents multiple cron instances from processing the same analysis
+        const claimedAnalysis = await AnalysisStatus.findOneAndUpdate(
+          {
+            status: "running",
+            started_at: { $lt: tenMinutesAgo },
+            // Ensure we don't process analyses that are already being resumed
+            // by checking if the progress.current_task doesn't indicate resumption
+            $or: [
+              { "progress.current_task": { $exists: false } },
+              { "progress.current_task": { $not: /^RESUMING:/ } },
+            ],
+          },
+          {
+            $set: {
+              "progress.current_task": `RESUMING: Claimed by cron at ${new Date().toISOString()}`,
+              updatedAt: new Date(),
+            },
+          },
+          {
+            new: true, // Return the updated document
+            sort: { started_at: 1 }, // Process oldest first
+          }
+        );
 
-        // Process the stuck analysis
-        await this.processAnalysisJob(job);
+        // If no analysis was claimed, break the loop
+        if (!claimedAnalysis) {
+          console.log(
+            `No more stuck analyses to process (attempt ${
+              i + 1
+            }/${maxProcessingAttempts})`
+          );
+          break;
+        }
+
+        console.log(
+          `Claimed stuck analysis ${claimedAnalysis.analysis_id} for processing`
+        );
+
+        try {
+          const job: AnalysisJob = {
+            brandId: claimedAnalysis.brand_id.toString(),
+            userId: claimedAnalysis.user_id.toString(),
+            models: claimedAnalysis.models,
+            stages: claimedAnalysis.stages,
+            analysisId: claimedAnalysis.analysis_id,
+          };
+
+          // Process the stuck analysis
+          await this.processAnalysisJob(job);
+          processedCount++;
+
+          console.log(
+            `Successfully resumed analysis ${claimedAnalysis.analysis_id}`
+          );
+        } catch (processingError) {
+          console.error(
+            `Failed to process claimed analysis ${claimedAnalysis.analysis_id}:`,
+            processingError
+          );
+
+          // Mark the analysis as failed since we couldn't process it
+          await this.failAnalysis(
+            claimedAnalysis.analysis_id,
+            processingError,
+            claimedAnalysis.user_id.toString(),
+            claimedAnalysis.brand_id.toString()
+          );
+        }
       }
 
-      return stuckAnalyses.length;
+      console.log(
+        `Cron job completed. Processed ${processedCount} stuck analyses.`
+      );
+      return processedCount;
     } catch (error) {
       console.error("Error resuming stuck analyses:", error);
       return 0;
