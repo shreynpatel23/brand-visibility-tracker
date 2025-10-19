@@ -7,9 +7,6 @@ import User from "@/lib/models/user";
 import { Invite } from "@/lib/models/invite";
 import { Membership } from "@/lib/models/membership";
 import connect from "@/lib/db";
-import { Types } from "mongoose";
-import Plan from "@/lib/models/plan";
-import { PlanTypes } from "@/types";
 import { CreditService } from "@/lib/services/creditService";
 
 const AcceptInviteBody = z.object({
@@ -113,18 +110,12 @@ export async function POST(request: NextRequest) {
         throw new Error("Password is required for signup.");
       }
       const hashedPassword = await bcrypt.hash(signup.password, 12);
-      // fetch all plans
-      const plans = await Plan.find();
 
-      const freePlan: any = plans.filter(
-        (plan) => plan.plan_id === PlanTypes.STARTER.toLowerCase()
-      );
       const newUser = new User({
         full_name: signup?.full_name,
         email: inviteEmail,
         password: hashedPassword,
         is_verified: true,
-        plan_id: new Types.ObjectId(freePlan?.[0]?._id),
         current_onboarding_step: null,
       });
       user = newUser;

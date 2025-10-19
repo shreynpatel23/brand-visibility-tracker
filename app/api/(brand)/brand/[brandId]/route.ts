@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import connect from "@/lib/db";
 import { Types } from "mongoose";
-import Plan from "@/lib/models/plan";
 import Brand from "@/lib/models/brand";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 import { z } from "zod";
@@ -43,9 +42,6 @@ export const GET = async (
 
     // establish the database connection
     await connect();
-
-    // load all plans
-    await Plan.find({});
 
     // get business details from brandId
     const brand = await Brand.findById(brandId).populate({

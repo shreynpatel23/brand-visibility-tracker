@@ -4,11 +4,19 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Zap, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  Bot,
+  Zap,
+  CreditCard,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+} from "lucide-react";
 import { toast } from "sonner";
 import { CreditBalance } from "@/components/credit-balance";
 import { postData } from "@/utils/fetch";
 import Loading from "../loading";
+import { useAnalysisStatus } from "@/hooks/use-analysis-status";
 
 interface AnalysisEstimate {
   creditsRequired: number;
@@ -71,6 +79,9 @@ export function AnalysisModelSelector({
   const [estimating, setEstimating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Use analysis status hook to check if analysis is running
+  const { isRunning, currentAnalysis } = useAnalysisStatus(userId, brandId);
+
   const fetchEstimate = async () => {
     if (selectedModels.length === 0) {
       setEstimate(null);
@@ -104,7 +115,7 @@ export function AnalysisModelSelector({
   }, [selectedModels]);
 
   const handleModelToggle = (modelId: string) => {
-    if (disabled) return;
+    if (disabled || isRunning) return;
 
     setSelectedModels((prev) =>
       prev.includes(modelId)
@@ -114,6 +125,11 @@ export function AnalysisModelSelector({
   };
 
   const handleStartAnalysis = async () => {
+    if (isRunning) {
+      toast.error("Analysis is already running for this brand!");
+      return;
+    }
+
     if (!estimate || !estimate.canAfford) {
       toast.error("Insufficient credits for this analysis");
       return;
@@ -144,12 +160,75 @@ export function AnalysisModelSelector({
   };
 
   const canStartAnalysis =
-    selectedModels.length > 0 && estimate?.canAfford && !disabled;
+    selectedModels.length > 0 && estimate?.canAfford && !disabled && !isRunning;
 
   return (
     <div className="space-y-4">
       {/* Credit Balance */}
       <CreditBalance userId={userId} compact={true} />
+
+      {/* Running Analysis Status */}
+      {isRunning && currentAnalysis && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 animate-pulse" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="font-medium text-blue-900 dark:text-blue-100">
+                  Analysis in Progress
+                </h4>
+                <Badge
+                  variant="secondary"
+                  className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100"
+                >
+                  Running
+                </Badge>
+              </div>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                {currentAnalysis.progress?.current_task ||
+                  "Processing analysis..."}
+              </p>
+              {currentAnalysis.progress && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-blue-600 dark:text-blue-400">
+                    <span>Progress</span>
+                    <span>
+                      {currentAnalysis.progress.completed_tasks} /{" "}
+                      {currentAnalysis.progress.total_tasks}
+                    </span>
+                  </div>
+                  <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${
+                          (currentAnalysis.progress.completed_tasks /
+                            currentAnalysis.progress.total_tasks) *
+                          100
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-wrap gap-1 mt-2">
+                <span className="text-xs text-blue-600 dark:text-blue-400">
+                  Models:
+                </span>
+                {currentAnalysis.models.map((model) => (
+                  <Badge
+                    key={model}
+                    variant="outline"
+                    className="text-xs border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300"
+                  >
+                    {model}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Model Selection */}
       <div className="mb-8">
@@ -171,13 +250,15 @@ export function AnalysisModelSelector({
                   isSelected
                     ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                     : "border-gray-200 dark:border-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                } ${
+                  disabled || isRunning ? "opacity-50 cursor-not-allowed" : ""
+                }`}
                 onClick={() => handleModelToggle(model.id)}
               >
                 <div className="flex items-start gap-2">
                   <Checkbox
                     checked={isSelected}
-                    disabled={disabled}
+                    disabled={disabled || isRunning}
                     className="mt-0.5"
                   />
                   <div className="flex-1 min-w-0">

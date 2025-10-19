@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "app/api/(brand)/brand/[brandId]/logs/route.ts": {
+      "maxDuration": 600
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/process-pending-analyses",
+      "schedule": "*/2 * * * *"
+    }
+  ]
+}

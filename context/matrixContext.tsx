@@ -150,9 +150,3 @@ export function useBrandMatrix(brandId: string) {
     hasData: showMatrixData,
   };
 }
-
-// Hook to refresh matrix data (useful for triggering refresh after analysis completion)
-export function useMatrixRefresh() {
-  const { refreshMatrixData } = useMatrix();
-  return refreshMatrixData;
-}
