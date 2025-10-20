@@ -7,23 +7,96 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, Mail } from "lucide-react";
+import { CheckCircle, CircleX, Clock, Mail } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import Loading from "../loading";
+import { fetchData } from "@/utils/fetch";
 
 interface AnalysisStartedModalProps {
   isOpen: boolean;
   onClose: () => void;
-  brandName?: string;
+  brandId: string;
   userEmail?: string;
 }
 
 export default function AnalysisStartedModal({
   isOpen,
   onClose,
-  brandName = "your brand",
+  brandId,
   userEmail,
 }: AnalysisStartedModalProps) {
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+  const [brandName, setBrandName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const fetchBrandName = useCallback(async () => {
+    try {
+      const response = await fetchData(`/api/brand/${brandId}`);
+      const { data } = response;
+      setBrandName(data.name || `Brand ${brandId}`);
+    } catch (error) {
+      setError(
+        `Failed to fetch brand name - ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [brandId]);
+
+  useEffect(() => {
+    setLoading(true);
+    if (brandId) {
+      fetchBrandName();
+    }
+  }, [fetchBrandName]);
+
+  function renderLayout() {
+    if (loading) {
+      return (
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Analysis Started Successfully!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4 min-h-48 flex items-center justify-center">
+            <Loading message="Fetching brand name..." />
+          </div>
+        </DialogContent>
+      );
+    }
+    if (error) {
+      return (
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Analysis Started Successfully!
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg border-red-200 bg-red-50">
+              <div className="flex items-center gap-3">
+                <CircleX className="h-5 w-5 text-red-500" />
+                <span className="text-sm text-red-600">{error}</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={fetchBrandName}
+                className="text-red-600 border-red-300 hover:bg-red-100"
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      );
+    }
+    return (
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -88,6 +161,12 @@ export default function AnalysisStartedModal({
           </Button>
         </div>
       </DialogContent>
+    );
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      {renderLayout()}
     </Dialog>
   );
 }

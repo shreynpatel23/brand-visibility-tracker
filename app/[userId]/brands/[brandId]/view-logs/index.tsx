@@ -8,7 +8,6 @@ import {
   XCircle,
   AlertCircle,
   FileText,
-  Download,
   Play,
   Filter,
 } from "lucide-react";
@@ -35,7 +34,6 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import AnalysisStartedModal from "@/components/analysis-started-modal";
-import { useMatrixRefresh } from "@/context/matrixContext";
 import { AnalysisModelSelector } from "@/components/analysis-model-selector";
 import {
   Dialog,
@@ -44,6 +42,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useAnalysisStatus } from "@/hooks/use-analysis-status";
+import { Badge } from "@/components/ui/badge";
 
 export default function ViewLogs({
   userId,
@@ -53,7 +53,17 @@ export default function ViewLogs({
   brandId: string;
 }) {
   const { user } = useUserContext();
-  const refreshMatrixData = useMatrixRefresh();
+  const {
+    isRunning,
+    currentAnalysis,
+    refreshAnalysisStatus,
+    fetchUpdatedLogs,
+    setFetchUpdatedLogs,
+  } = useAnalysisStatus({
+    brandId,
+    userId,
+    refreshInterval: 30000,
+  });
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedModel, setSelectedModel] = useState("all");
@@ -105,42 +115,36 @@ export default function ViewLogs({
     setExpandedRows(newExpanded);
   };
 
-  // Fetch logs data
-  useEffect(() => {
-    async function fetchLogsData() {
-      if (!userId || !brandId || !user._id) return;
+  const fetchLogsData = useCallback(async () => {
+    if (!userId || !brandId || !user._id) return;
 
-      try {
-        setLoading(true);
-        setError("");
+    try {
+      setError("");
 
-        const params = new URLSearchParams({
-          userId: user._id,
-          page: currentPage.toString(),
-          limit: limit.toString(),
-          model: selectedModel,
-          stage: selectedStage,
-          status: selectedStatus,
-          search: debouncedSearchTerm,
-          sortBy: sortBy,
-          sortOrder: "desc",
-        });
+      const params = new URLSearchParams({
+        userId: user._id,
+        page: currentPage.toString(),
+        limit: limit.toString(),
+        model: selectedModel,
+        stage: selectedStage,
+        status: selectedStatus,
+        search: debouncedSearchTerm,
+        sortBy: sortBy,
+        sortOrder: "desc",
+      });
 
-        const url = `/api/brand/${brandId}/logs?${params.toString()}`;
-        const response = await fetchData(url);
-        const { data } = response;
-        setLogsData(data);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch logs data"
-        );
-        console.error("Logs fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
+      const url = `/api/brand/${brandId}/logs?${params.toString()}`;
+      const response = await fetchData(url);
+      const { data } = response;
+      setLogsData(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch logs data"
+      );
+      console.error("Logs fetch error:", err);
+    } finally {
+      setLoading(false);
     }
-
-    fetchLogsData();
   }, [
     userId,
     brandId,
@@ -153,6 +157,20 @@ export default function ViewLogs({
     limit,
     sortBy,
   ]);
+
+  // Fetch logs data
+  useEffect(() => {
+    setLoading(true);
+    fetchLogsData();
+  }, [fetchLogsData]);
+
+  // use effect to fetch updated logs
+  useEffect(() => {
+    if (fetchUpdatedLogs) {
+      fetchLogsData();
+      setFetchUpdatedLogs(false);
+    }
+  }, [fetchUpdatedLogs, fetchLogsData]);
 
   // Open analysis model selector modal
   const triggerAnalysis = () => {
@@ -289,17 +307,90 @@ export default function ViewLogs({
         <div className="flex items-center gap-3">
           <Button
             onClick={triggerAnalysis}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+            disabled={isRunning}
+            className={`flex items-center gap-2 ${
+              isRunning
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-primary hover:bg-primary/90"
+            }`}
           >
-            <Play className="w-4 h-4" />
-            Trigger Analysis
-          </Button>
-          <Button className="flex items-center gap-2" variant="outline">
-            <Download className="w-4 h-4" />
-            Export Logs
+            {isRunning ? (
+              <>
+                <Clock className="w-4 h-4 animate-pulse" />
+                Analysis Running...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                Trigger Analysis
+              </>
+            )}
           </Button>
         </div>
       </div>
+
+      {/* Running Analysis Status */}
+      {isRunning && currentAnalysis && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 animate-pulse" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <h4 className="font-medium text-blue-900 dark:text-blue-100">
+                  Analysis in Progress
+                </h4>
+                <Badge
+                  variant="secondary"
+                  className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100"
+                >
+                  Running
+                </Badge>
+              </div>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                {currentAnalysis?.progress?.current_task ||
+                  "Processing analysis..."}
+              </p>
+              {currentAnalysis.progress && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-blue-600 dark:text-blue-400">
+                    <span>Progress</span>
+                    <span>
+                      {currentAnalysis.progress.completed_tasks} /{" "}
+                      {currentAnalysis.progress.total_tasks}
+                    </span>
+                  </div>
+                  <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${
+                          (currentAnalysis.progress.completed_tasks /
+                            currentAnalysis.progress.total_tasks) *
+                          100
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center flex-wrap gap-1 mt-2">
+                <span className="text-xs text-blue-600 dark:text-blue-400">
+                  Models:
+                </span>
+                {currentAnalysis.models.map((model) => (
+                  <Badge
+                    key={model}
+                    variant="outline"
+                    className="text-xs border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300"
+                  >
+                    {model}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
@@ -725,11 +816,10 @@ export default function ViewLogs({
               onAnalysisStart={() => {
                 setShowAnalysisSelectorModal(false);
                 setShowAnalysisModal(true);
-                // Refresh matrix data and logs after analysis starts
-                refreshMatrixData();
                 setTimeout(() => {
                   setCurrentPage(1);
                 }, 2000);
+                refreshAnalysisStatus();
               }}
             />
           </div>
@@ -740,7 +830,7 @@ export default function ViewLogs({
       <AnalysisStartedModal
         isOpen={showAnalysisModal}
         onClose={() => setShowAnalysisModal(false)}
-        brandName="your brand"
+        brandId={brandId}
         userEmail={user?.email}
       />
     </div>

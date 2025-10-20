@@ -5,15 +5,12 @@ import Brand from "@/lib/models/brand";
 import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
 import { authMiddleware } from "@/middlewares/apis/authMiddleware";
 import { Membership } from "@/lib/models/membership";
-import { AIService } from "@/lib/services/aiService";
-import { DataOrganizationService } from "@/lib/services/dataOrganizationService";
 import { z } from "zod";
 import { RouteParams, BrandParams } from "@/types/api";
 import { AIModel, AnalysisStage } from "@/types/brand";
-import User from "@/lib/models/user";
-import { sendEmail } from "@/utils/sendEmail";
-import { analysisCompletionEmailTemplate } from "@/utils/analysisCompletionEmailTemplate";
 import { CreditService } from "@/lib/services/creditService";
+import { qstash } from "@/lib/qstash";
+import AnalysisStatus from "@/lib/models/analysisStatus";
 
 const LogsQuerySchema = z.object({
   userId: z.string().min(1, "User ID is required"),
@@ -44,266 +41,6 @@ const TriggerAnalysisSchema = z.object({
   models: z.array(z.enum(["ChatGPT", "Claude", "Gemini"])).optional(),
   stages: z.array(z.enum(["TOFU", "MOFU", "BOFU", "EVFU"])).optional(),
 });
-
-// Background analysis function
-async function runAnalysisInBackground(
-  brandId: string,
-  userId: string,
-  modelsToAnalyze: AIModel[],
-  stagesToAnalyze: AnalysisStage[]
-) {
-  try {
-    console.log(`Starting background analysis for brand ${brandId}`);
-
-    // Re-establish database connection for background process
-    await connect();
-
-    // Get brand and user details
-    const brand = await Brand.findById(brandId);
-    const user = await User.findById(userId);
-
-    if (!brand || !user) {
-      console.error("Brand or user not found for background analysis");
-      return;
-    }
-
-    const analysisStartTime = Date.now();
-    const comprehensiveResults =
-      await AIService.comprehensiveMultiPromptAnalysis(
-        brand,
-        modelsToAnalyze,
-        stagesToAnalyze
-      );
-
-    const analysisResults = [];
-
-    // Process and save each result
-    for (const { model, stage, result } of comprehensiveResults) {
-      try {
-        // Validate result data before processing
-        if (
-          !result ||
-          typeof result.overallScore !== "number" ||
-          typeof result.weightedScore !== "number"
-        ) {
-          console.error(`Invalid result data for ${model}-${stage}:`, result);
-          continue;
-        }
-
-        // Use the enhanced data organization service
-        const organizedData =
-          await DataOrganizationService.processAndStoreAnalysis(
-            brandId,
-            model,
-            stage,
-            result,
-            userId,
-            "manual"
-          );
-
-        analysisResults.push({
-          model,
-          stage,
-          result: {
-            analysisId: organizedData.analysis_id,
-            overallScore: organizedData.overall_score,
-            weightedScore: organizedData.weighted_score,
-            mentionRate: organizedData.mention_rate,
-            topPositionRate: organizedData.top_position_rate,
-            performanceLevel: organizedData.performance_level,
-            primaryInsight: organizedData.primary_insight,
-            recommendations: organizedData.recommendations,
-            totalResponseTime: organizedData.metadata.total_processing_time,
-            successRate:
-              (organizedData.metadata.successful_prompts /
-                organizedData.metadata.total_prompts) *
-              100,
-            aggregatedSentiment: organizedData.sentiment_analysis,
-          },
-        });
-      } catch (saveError) {
-        console.error(
-          `Error processing analysis for ${model}-${stage}:`,
-          saveError
-        );
-      }
-    }
-
-    const totalAnalysisTime = Date.now() - analysisStartTime;
-
-    // Calculate summary statistics
-    const totalAnalyses = analysisResults.length;
-    const avgScore =
-      analysisResults.length > 0
-        ? analysisResults.reduce((sum, r) => sum + r.result.overallScore, 0) /
-          analysisResults.length
-        : 0;
-    const avgWeightedScore =
-      analysisResults.length > 0
-        ? analysisResults.reduce((sum, r) => sum + r.result.weightedScore, 0) /
-          analysisResults.length
-        : 0;
-
-    // Send completion email
-    const dashboardLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${userId}/brands/${brandId}/dashboard`;
-    const emailTemplate = analysisCompletionEmailTemplate(
-      brand.name,
-      dashboardLink,
-      {
-        totalAnalyses,
-        averageScore: Math.round(avgScore * 100) / 100,
-        averageWeightedScore: Math.round(avgWeightedScore * 100) / 100,
-        completionTime: totalAnalysisTime,
-      }
-    );
-
-    await sendEmail(
-      user.email,
-      `Analysis Complete - ${brand.name}`,
-      emailTemplate
-    );
-  } catch (error) {
-    console.error("Background analysis error:", error);
-
-    // Try to send error notification email
-    try {
-      const user = await User.findById(userId);
-      const brand = await Brand.findById(brandId);
-
-      if (user && brand) {
-        await sendEmail(
-          user.email,
-          `Analysis Failed - ${brand.name}`,
-          `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-              <h2>Analysis Failed</h2>
-              <p>Unfortunately, the analysis for <strong>${
-                brand.name
-              }</strong> failed to complete.</p>
-              <p>Please try again or contact support if the issue persists.</p>
-              <p>Error: ${
-                error instanceof Error ? error.message : "Unknown error"
-              }</p>
-            </div>
-          `
-        );
-      }
-    } catch (emailError) {
-      console.error("Failed to send error notification email:", emailError);
-    }
-  }
-}
-
-// Helper function to update daily metrics (currently unused)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function updateDailyMetrics(brandId: string) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  // Get today's multi-prompt analysis data
-  const todaysAnalyses = await MultiPromptAnalysis.find({
-    brand_id: brandId,
-    createdAt: { $gte: today, $lt: tomorrow },
-    status: "success",
-  });
-
-  if (todaysAnalyses.length === 0) return;
-
-  // Calculate aggregated metrics using weighted scores
-  const totalAnalyses = todaysAnalyses.length;
-  const avgWeightedScore =
-    todaysAnalyses.reduce((sum, item) => sum + item.weighted_score, 0) /
-    totalAnalyses;
-  const avgResponseTime =
-    todaysAnalyses.reduce((sum, item) => sum + item.total_response_time, 0) /
-    totalAnalyses;
-  const successRate =
-    todaysAnalyses.reduce((sum, item) => sum + item.success_rate, 0) /
-    totalAnalyses;
-
-  // Calculate model breakdown using weighted scores
-  const modelBreakdown = {
-    ChatGPT: { score: 0, prompts: 0, avgResponseTime: 0, successRate: 0 },
-    Claude: { score: 0, prompts: 0, avgResponseTime: 0, successRate: 0 },
-    Gemini: { score: 0, prompts: 0, avgResponseTime: 0, successRate: 0 },
-  };
-
-  todaysAnalyses.forEach((analysis) => {
-    const model = analysis.model as keyof typeof modelBreakdown;
-    modelBreakdown[model].score += analysis.weighted_score; // Use weighted score
-    modelBreakdown[model].prompts += 1;
-    modelBreakdown[model].avgResponseTime += analysis.total_response_time;
-    modelBreakdown[model].successRate += analysis.success_rate;
-  });
-
-  // Calculate averages for each model
-  Object.keys(modelBreakdown).forEach((modelKey) => {
-    const model = modelKey as keyof typeof modelBreakdown;
-    if (modelBreakdown[model].prompts > 0) {
-      modelBreakdown[model].score =
-        modelBreakdown[model].score / modelBreakdown[model].prompts;
-      modelBreakdown[model].avgResponseTime =
-        modelBreakdown[model].avgResponseTime / modelBreakdown[model].prompts;
-      modelBreakdown[model].successRate =
-        modelBreakdown[model].successRate / modelBreakdown[model].prompts;
-    }
-  });
-
-  // Calculate stage breakdown
-  const stageBreakdown = { TOFU: 0, MOFU: 0, BOFU: 0, EVFU: 0 };
-  const stageCounts = { TOFU: 0, MOFU: 0, BOFU: 0, EVFU: 0 };
-
-  todaysAnalyses.forEach((analysis) => {
-    const stage = analysis.stage as keyof typeof stageBreakdown;
-    stageBreakdown[stage] += analysis.weighted_score; // Use weighted score
-    stageCounts[stage] += 1;
-  });
-
-  Object.keys(stageBreakdown).forEach((stageKey) => {
-    const stage = stageKey as keyof typeof stageBreakdown;
-    if (stageCounts[stage] > 0) {
-      stageBreakdown[stage] = stageBreakdown[stage] / stageCounts[stage];
-    }
-  });
-
-  // Calculate sentiment breakdown
-  const sentimentBreakdown = {
-    positive: 0,
-    neutral: 0,
-    negative: 0,
-    strongly_positive: 0,
-  };
-  todaysAnalyses.forEach((analysis) => {
-    sentimentBreakdown.positive +=
-      analysis.aggregated_sentiment.distribution.positive;
-    sentimentBreakdown.neutral +=
-      analysis.aggregated_sentiment.distribution.neutral;
-    sentimentBreakdown.negative +=
-      analysis.aggregated_sentiment.distribution.negative;
-    sentimentBreakdown.strongly_positive +=
-      analysis.aggregated_sentiment.distribution.strongly_positive;
-  });
-
-  // Calculate averages
-  Object.keys(sentimentBreakdown).forEach((key) => {
-    const sentimentKey = key as keyof typeof sentimentBreakdown;
-    sentimentBreakdown[sentimentKey] =
-      sentimentBreakdown[sentimentKey] / totalAnalyses;
-  });
-
-  // Note: Daily metrics aggregation removed - using MultiPromptAnalysis directly
-  console.log(`Updated daily metrics for brand ${brandId}:`, {
-    totalAnalyses,
-    avgWeightedScore,
-    avgResponseTime,
-    successRate,
-    modelBreakdown,
-    stageBreakdown,
-  });
-}
 
 // Brand analysis logs API
 export const GET = async (
@@ -641,6 +378,28 @@ export const POST = async (
       );
     }
 
+    // Check if there's already a running analysis for this brand
+    const runningAnalysis = await AnalysisStatus.findOne({
+      brand_id: brandId,
+      status: "running",
+    });
+
+    if (runningAnalysis) {
+      return new NextResponse(
+        JSON.stringify({
+          message: "Analysis is already running for this brand!",
+          data: {
+            currentAnalysisId: runningAnalysis.analysis_id,
+            startedAt: runningAnalysis.started_at,
+            models: runningAnalysis.models,
+            stages: runningAnalysis.stages,
+            progress: runningAnalysis.progress,
+          },
+        }),
+        { status: 409 } // Conflict
+      );
+    }
+
     // Default to all models and stages if not specified
     const modelsToAnalyze: AIModel[] = models || [
       "ChatGPT",
@@ -690,6 +449,23 @@ export const POST = async (
     // Generate analysis ID for tracking
     const analysisId = `multi-${brandId}-${Date.now()}`;
 
+    // Create analysis status record
+    const totalTasks = modelsToAnalyze.length * stagesToAnalyze.length;
+    await AnalysisStatus.create({
+      brand_id: brandId,
+      user_id: userId,
+      analysis_id: analysisId,
+      status: "running",
+      models: modelsToAnalyze,
+      stages: stagesToAnalyze,
+      started_at: new Date(),
+      progress: {
+        total_tasks: totalTasks,
+        completed_tasks: 0,
+        current_task: "Initializing analysis...",
+      },
+    });
+
     // Deduct credits before starting analysis
     try {
       await CreditService.deductCredits(
@@ -710,17 +486,23 @@ export const POST = async (
       );
     }
 
-    // Start analysis in background
-    console.log(`Triggering background analysis for brand ${brand.name}`);
+    // send message to qstash
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL!;
+    const webhookUrl = `${baseUrl}/api/run-analysis`;
 
-    // Don't await - let it run in background
-    setImmediate(() => {
-      runAnalysisInBackground(
+    console.log(`keep listening on webhook url ${webhookUrl}`);
+
+    // Send message to QStash queue
+    await qstash.publishJSON({
+      url: webhookUrl,
+      body: {
+        brandName: brand.name,
         brandId,
         userId,
         modelsToAnalyze,
-        stagesToAnalyze
-      );
+        stagesToAnalyze,
+        analysisId,
+      },
     });
 
     // Return immediate response
