@@ -10,7 +10,8 @@ import { z } from "zod";
 import { RouteParams, BrandParams } from "@/types/api";
 import { AIModel, AnalysisStage } from "@/types/brand";
 import { CreditService } from "@/lib/services/creditService";
-import { AnalysisQueueService } from "@/lib/services/analysisQueueService";
+import { BackgroundAnalysisService } from "@/lib/services/backgroundAnalysisService";
+import { QStashService } from "@/lib/services/qstashService";
 
 const LogsQuerySchema = z.object({
   userId: z.string().min(1, "User ID is required"),
@@ -597,11 +598,11 @@ export const POST = async (
       );
     }
 
-    // Start analysis in background
-    console.log(`Triggering background analysis for brand ${brand.name}`);
+    // Start analysis in background using QStash
+    console.log(
+      `Triggering background analysis for brand ${brand.name} via QStash`
+    );
 
-    // For Vercel deployment, use the improved queue service
-    // This handles timeouts and interruptions more gracefully
     const analysisJob = {
       brandId,
       userId,
@@ -610,11 +611,45 @@ export const POST = async (
       analysisId,
     };
 
-    // Start the analysis job - don't await to avoid timeout
-    AnalysisQueueService.processAnalysisJob(analysisJob).catch((error) => {
-      console.error("Analysis job failed:", error);
-      // The cron job will pick up stuck analyses
-    });
+    // Start analysis based on environment
+    console.log(`🚀 Starting background analysis for brand ${brand.name}`);
+
+    const isProduction =
+      process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_BASE_URL;
+
+    if (isProduction) {
+      // Production: Use QStash for reliable background processing
+      console.log("🌐 Production mode: Using QStash for background analysis");
+
+      // Schedule the analysis via QStash
+      QStashService.scheduleAnalysisJob(analysisJob).catch((error) => {
+        console.error("Failed to schedule analysis job with QStash:", error);
+        // Fallback: try to process directly if QStash fails
+        BackgroundAnalysisService.runAnalysisInBackground(analysisJob).catch(
+          (fallbackError) => {
+            console.error("Fallback analysis also failed:", fallbackError);
+          }
+        );
+      });
+
+      // Schedule status updates for optimized frontend polling
+      QStashService.scheduleStatusUpdates(analysisId, userId).catch((error) => {
+        console.error("Failed to schedule status updates:", error);
+      });
+
+      // Auto-initialize stuck analysis checking (if not already running)
+      QStashService.initializeStuckAnalysisChecking().catch((error) => {
+        console.error("Failed to initialize stuck analysis checking:", error);
+      });
+    } else {
+      // Development: Process directly for immediate feedback
+      console.log("🏠 Development mode: Processing analysis directly");
+      BackgroundAnalysisService.runAnalysisInBackground(analysisJob).catch(
+        (error) => {
+          console.error("Background analysis failed:", error);
+        }
+      );
+    }
 
     // Return immediate response
     return new NextResponse(
