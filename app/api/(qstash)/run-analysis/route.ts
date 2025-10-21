@@ -10,17 +10,37 @@ import { DataOrganizationService } from "@/lib/services/dataOrganizationService"
 import { analysisCompletionEmailTemplate } from "@/utils/analysisCompletionEmailTemplate";
 import { sendEmail } from "@/utils/sendEmail";
 import AnalysisStatus from "@/lib/models/analysisStatus";
+import AnalysisPair from "@/lib/models/analysisPair";
+import { qstash } from "@/lib/qstash";
+import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
+import { Types } from "mongoose";
 
 // Background analysis function
-async function runAnalysisInBackground(
-  brandId: string,
-  userId: string,
-  models: AIModel[],
-  stages: AnalysisStage[],
-  analysisId: string
-) {
+async function runAnalysisInBackground({
+  brandId,
+  userId,
+  currentPair,
+  remainingPairs,
+  analysisId,
+  analysisStartedAt,
+}: {
+  brandId: string;
+  userId: string;
+  currentPair: {
+    model: AIModel;
+    stage: AnalysisStage;
+  };
+  remainingPairs: {
+    model: AIModel;
+    stage: AnalysisStage;
+  }[];
+  analysisId: string;
+  analysisStartedAt: Date;
+}) {
   try {
-    console.log(`🚀 Starting background analysis ${analysisId}`);
+    console.log(
+      `🚀 Running analysis ${analysisId}: ${currentPair.model}-${currentPair.stage}`
+    );
     await connect();
 
     // Get current analysis status
@@ -48,179 +68,172 @@ async function runAnalysisInBackground(
       throw new Error("Brand or user not found for background analysis");
     }
 
-    const totalTasks = models.length * stages.length;
-    let completedTasks = currentAnalysis.progress?.completed_tasks || 0;
-    const analysisResults = [];
+    try {
+      // update the analysis progress current task to the current pair
+      await AnalysisStatus.findOneAndUpdate(
+        { analysis_id: analysisId },
+        {
+          $set: {
+            "progress.current_task": `Running analysis for ${currentPair.model}-${currentPair.stage}`,
+          },
+        }
+      );
 
-    console.log(
-      `📊 Analysis progress: ${completedTasks}/${totalTasks} tasks completed`
-    );
-
-    // Create all model-stage combinations
-    const allCombinations = [];
-    for (const model of models) {
-      for (const stage of stages) {
-        allCombinations.push({ model, stage });
-      }
-    }
-
-    // Process from where we left off
-    for (let i = completedTasks; i < allCombinations.length; i++) {
-      const { model, stage } = allCombinations[i];
-
-      try {
-        console.log(
-          `🔄 Processing ${model} - ${stage} (${i + 1}/${totalTasks})`
-        );
-
-        // Update progress before starting this task
-        await AnalysisStatus.findOneAndUpdate(
-          { analysis_id: analysisId, status: "running" },
-          {
-            $set: {
-              "progress.current_task": `Analyzing ${model} - ${stage}...`,
-              "progress.completed_tasks": i,
-              updatedAt: new Date(),
-            },
-          }
-        );
-
-        // Check if analysis is still running
-        const statusCheck = await AnalysisStatus.findOne({
+      // Mark pair as running
+      await AnalysisPair.findOneAndUpdate(
+        {
           analysis_id: analysisId,
-        });
+          model: currentPair.model,
+          stage: currentPair.stage,
+        },
+        { status: "running" }
+      );
 
-        if (!statusCheck || statusCheck.status !== "running") {
-          console.log(`⏹️ Analysis ${analysisId} was stopped, exiting`);
-          return;
+      // Run actual AI analysis
+      const result = await AIService.analyzeWithMultiplePrompts(
+        brand,
+        currentPair.model,
+        currentPair.stage
+      );
+      if (!result) throw new Error("AI result empty");
+
+      await DataOrganizationService.processAndStoreAnalysis(
+        brandId,
+        currentPair.model,
+        currentPair.stage,
+        result,
+        userId,
+        "manual"
+      );
+
+      // Mark pair completed
+      await AnalysisPair.findOneAndUpdate(
+        {
+          analysis_id: analysisId,
+          model: currentPair.model,
+          stage: currentPair.stage,
+        },
+        { status: "completed" }
+      );
+
+      // Update global progress
+      const status = await AnalysisStatus.findOne({ analysis_id: analysisId });
+      const completedTasks = (status?.progress?.completed_tasks || 0) + 1;
+
+      await AnalysisStatus.findOneAndUpdate(
+        { analysis_id: analysisId },
+        {
+          $set: {
+            "progress.completed_tasks": completedTasks,
+            "progress.current_task": `Completed analysis for ${currentPair.model}-${currentPair.stage}`,
+          },
         }
+      );
 
-        // Run the actual AI analysis
-        const result = await AIService.analyzeWithMultiplePrompts(
-          brand,
-          model,
-          stage
+      console.log(
+        `✅ Finished ${currentPair.model}-${currentPair.stage} (${completedTasks}/${status.progress.total_tasks})`
+      );
+
+      // Trigger next pair if any
+      if (remainingPairs && remainingPairs.length > 0) {
+        const [nextPair, ...nextRemaining] = remainingPairs;
+
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL!;
+        const webhookUrl = `${baseUrl}/api/run-analysis`;
+
+        console.log(
+          `Scheduling next pair: ${nextPair.model}-${nextPair.stage}`
         );
-
-        // Validate result
-        if (
-          !result ||
-          typeof result.overallScore !== "number" ||
-          typeof result.weightedScore !== "number"
-        ) {
-          console.error(`❌ Invalid result for ${model}-${stage}:`, result);
-          continue;
-        }
-
-        // Store the analysis result
-        const organizedData =
-          await DataOrganizationService.processAndStoreAnalysis(
+        await qstash.publishJSON({
+          url: webhookUrl,
+          body: {
+            brandName: brand.name,
             brandId,
-            model,
-            stage,
-            result,
             userId,
-            "manual"
-          );
-
-        analysisResults.push({
-          model,
-          stage,
-          result: {
-            analysisId: organizedData.analysis_id,
-            overallScore: organizedData.overall_score,
-            weightedScore: organizedData.weighted_score,
-            mentionRate: organizedData.mention_rate,
-            topPositionRate: organizedData.top_position_rate,
-            performanceLevel: organizedData.performance_level,
-            primaryInsight: organizedData.primary_insight,
-            recommendations: organizedData.recommendations,
-            totalResponseTime: organizedData.metadata.total_processing_time,
-            successRate:
-              (organizedData.metadata.successful_prompts /
-                organizedData.metadata.total_prompts) *
-              100,
-            aggregatedSentiment: organizedData.sentiment_analysis,
+            analysisId,
+            currentPair: nextPair,
+            remainingPairs: nextRemaining,
+            analysisStartedAt,
           },
         });
 
-        // Update progress after completing this task
-        completedTasks = i + 1;
-        await AnalysisStatus.findOneAndUpdate(
-          { analysis_id: analysisId, status: "running" },
-          {
-            $set: {
-              "progress.completed_tasks": completedTasks,
-              "progress.current_task": `Completed ${model}-${stage} (${completedTasks}/${totalTasks})`,
-              updatedAt: new Date(),
-            },
-          }
-        );
-
         console.log(
-          `✅ Completed ${model} - ${stage} (${completedTasks}/${totalTasks})`
+          `🔁 Triggered next pair: ${nextPair.model}-${nextPair.stage}`
         );
-      } catch (taskError) {
-        console.error(`❌ Error processing ${model}-${stage}:`, taskError);
-
-        // Still update progress even if this task failed
-        completedTasks = i + 1;
+      } else {
+        // All done — mark analysis complete
         await AnalysisStatus.findOneAndUpdate(
-          { analysis_id: analysisId, status: "running" },
+          { analysis_id: analysisId },
           {
             $set: {
-              "progress.completed_tasks": completedTasks,
-              "progress.current_task": `Error in ${model}-${stage} (${completedTasks}/${totalTasks})`,
-              updatedAt: new Date(),
+              status: "completed",
+              "progress.current_task": "All analyses completed",
             },
           }
         );
+
+        // fetch the analysis result from the database which are created after the analysis started at
+        const analysisResults = await MultiPromptAnalysis.find({
+          brand_id: new Types.ObjectId(brandId),
+          createdAt: { $gte: analysisStartedAt },
+        });
+
+        // Calculate summary statistics
+        const totalAnalyses = analysisResults.length;
+        const totalAnalysisTime = Date.now() - currentAnalysis.started_at;
+        const avgScore =
+          analysisResults.length > 0
+            ? analysisResults.reduce((sum, r) => sum + r.overall_score, 0) /
+              analysisResults.length
+            : 0;
+        const avgWeightedScore =
+          analysisResults.length > 0
+            ? analysisResults.reduce((sum, r) => sum + r.weighted_score, 0) /
+              analysisResults.length
+            : 0;
+
+        // Send completion email
+        const dashboardLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${userId}/brands/${brandId}/dashboard`;
+        const emailTemplate = analysisCompletionEmailTemplate(
+          brand.name,
+          dashboardLink,
+          {
+            totalAnalyses,
+            averageScore: Math.round(avgScore * 100) / 100,
+            averageWeightedScore: Math.round(avgWeightedScore * 100) / 100,
+            completionTime: totalAnalysisTime,
+          }
+        );
+        await sendEmail(
+          user.email,
+          `Analysis Complete - ${brand.name}`,
+          emailTemplate
+        );
+
+        console.log(`🎉 Analysis ${analysisId} completed successfully!`);
       }
-    }
 
-    // Calculate summary statistics
-    const totalAnalyses = analysisResults.length;
-    const totalAnalysisTime = Date.now() - currentAnalysis.started_at;
-    const avgScore =
-      analysisResults.length > 0
-        ? analysisResults.reduce((sum, r) => sum + r.result.overallScore, 0) /
-          analysisResults.length
-        : 0;
-    const avgWeightedScore =
-      analysisResults.length > 0
-        ? analysisResults.reduce((sum, r) => sum + r.result.weightedScore, 0) /
-          analysisResults.length
-        : 0;
+      return NextResponse.json({ success: true });
+    } catch (err) {
+      console.error(
+        `❌ Error processing ${currentPair.model}-${currentPair.stage}:`,
+        err
+      );
 
-    // Update analysis status to completed
-    await AnalysisStatus.findOneAndUpdate(
-      { analysis_id: analysisId },
-      {
-        $set: {
-          status: "completed",
-          completed_at: new Date(),
-          "progress.current_task": "Analysis completed successfully!",
+      await AnalysisPair.findOneAndUpdate(
+        {
+          analysis_id: analysisId,
+          model: currentPair.model,
+          stage: currentPair.stage,
         },
-      }
-    );
+        { status: "failed" }
+      );
 
-    // Send completion email
-    const dashboardLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${userId}/brands/${brandId}/dashboard`;
-    const emailTemplate = analysisCompletionEmailTemplate(
-      brand.name,
-      dashboardLink,
-      {
-        totalAnalyses,
-        averageScore: Math.round(avgScore * 100) / 100,
-        averageWeightedScore: Math.round(avgWeightedScore * 100) / 100,
-        completionTime: totalAnalysisTime,
-      }
-    );
-    await sendEmail(
-      user.email,
-      `Analysis Complete - ${brand.name}`,
-      emailTemplate
-    );
+      return NextResponse.json(
+        { message: "Error", error: err },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Background analysis error:", error);
 
@@ -258,25 +271,23 @@ async function handler(req: Request) {
 
   // extract brandId, userId, modelsToAnalyse and stagesToAnalyse
   const {
-    brandName,
     brandId,
     userId,
-    modelsToAnalyze,
-    stagesToAnalyze,
     analysisId,
+    currentPair,
+    remainingPairs,
+    analysisStartedAt,
   } = body;
 
-  // Start analysis in background
-  console.log(`Triggering background analysis for brand ${brandName}`);
-
   // Run analysis in background
-  runAnalysisInBackground(
+  runAnalysisInBackground({
     brandId,
     userId,
-    modelsToAnalyze,
-    stagesToAnalyze,
-    analysisId
-  );
+    currentPair,
+    remainingPairs,
+    analysisId,
+    analysisStartedAt,
+  });
 
   return NextResponse.json({ status: "done" });
 }

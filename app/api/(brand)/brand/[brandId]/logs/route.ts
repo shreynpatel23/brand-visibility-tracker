@@ -11,6 +11,7 @@ import { AIModel, AnalysisStage } from "@/types/brand";
 import { CreditService } from "@/lib/services/creditService";
 import { qstash } from "@/lib/qstash";
 import AnalysisStatus from "@/lib/models/analysisStatus";
+import AnalysisPair from "@/lib/models/analysisPair";
 
 const LogsQuerySchema = z.object({
   userId: z.string().min(1, "User ID is required"),
@@ -448,8 +449,21 @@ export const POST = async (
 
     // Generate analysis ID for tracking
     const analysisId = `multi-${brandId}-${Date.now()}`;
+    const analysisStartedAt = new Date();
 
-    // Create analysis status record
+    // Create all model-stage combinations (pairs)
+    const pairs = [];
+    for (const model of modelsToAnalyze) {
+      for (const stage of stagesToAnalyze) {
+        pairs.push({
+          model,
+          stage,
+          status: "pending" as const,
+        });
+      }
+    }
+
+    // Create analysis status record with pairs
     const totalTasks = modelsToAnalyze.length * stagesToAnalyze.length;
     await AnalysisStatus.create({
       brand_id: brandId,
@@ -465,6 +479,18 @@ export const POST = async (
         current_task: "Initializing analysis...",
       },
     });
+
+    // Create individual AnalysisPair documents for detailed tracking
+    const pairDocuments = pairs.map((pair) => ({
+      analysis_id: analysisId,
+      brand_id: brandId,
+      user_id: userId,
+      model: pair.model,
+      stage: pair.stage,
+      status: pair.status,
+    }));
+
+    await AnalysisPair.insertMany(pairDocuments);
 
     // Deduct credits before starting analysis
     try {
@@ -486,22 +512,27 @@ export const POST = async (
       );
     }
 
-    // send message to qstash
+    // Schedule recurring QStash jobs every 10 minutes
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL!;
     const webhookUrl = `${baseUrl}/api/run-analysis`;
 
-    console.log(`keep listening on webhook url ${webhookUrl}`);
+    console.log(`Scheduling recurring analysis jobs for ${webhookUrl}`);
+    // Start analysis in background
+    console.log(`Triggering background analysis for brand ${brand.name}`);
 
-    // Send message to QStash queue
+    // Enqueue first QStash job (no cron, just one-time)
+    const [firstPair, ...remainingPairs] = pairs;
+
+    // Schedule recurring jobs every 5 minutes
     await qstash.publishJSON({
       url: webhookUrl,
       body: {
-        brandName: brand.name,
         brandId,
         userId,
-        modelsToAnalyze,
-        stagesToAnalyze,
         analysisId,
+        currentPair: firstPair,
+        remainingPairs,
+        analysisStartedAt,
       },
     });
 
