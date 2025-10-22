@@ -14,8 +14,6 @@ export interface OrganizedAnalysisData {
   // Core Metrics
   overall_score: number;
   weighted_score: number;
-  mention_rate: number;
-  top_position_rate: number;
 
   // Performance Insights
   performance_level: "excellent" | "good" | "fair" | "poor";
@@ -120,16 +118,21 @@ export class DataOrganizationService {
           continue;
         }
 
-        // Calculate comprehensive weighted score
-        const scoringResult = ScoringService.calculateWeightedScore(
-          promptResult.score,
-          promptResult.mentionPosition,
-          stage,
-          prompt,
-          promptResult.sentiment
-        );
+        const scoringResult: ScoringResult = {
+          raw_score: promptResult.score,
+          position_weighted_score: promptResult.weightedScore,
+          mention_position: promptResult.mentionPosition,
+          stage_specific_classification:
+            promptResult.stage_specific_classification,
+        };
 
-        scoringResults.push(scoringResult);
+        scoringResults.push({
+          raw_score: promptResult.score,
+          position_weighted_score: promptResult.weightedScore,
+          mention_position: promptResult.mentionPosition,
+          stage_specific_classification:
+            promptResult.stage_specific_classification,
+        });
 
         processedPromptResults.push({
           prompt_id: promptResult.promptId,
@@ -140,10 +143,6 @@ export class DataOrganizationService {
           status: promptResult.status,
         });
       }
-
-      // Calculate aggregate metrics
-      const aggregateScores =
-        ScoringService.calculateAggregateScores(scoringResults);
 
       // Generate insights
       const insights = ScoringService.generateInsights(scoringResults, stage);
@@ -157,10 +156,8 @@ export class DataOrganizationService {
         timestamp: new Date(),
 
         // Core Metrics
-        overall_score: aggregateScores.overall_score,
-        weighted_score: aggregateScores.weighted_score,
-        mention_rate: aggregateScores.mention_rate,
-        top_position_rate: aggregateScores.top_position_rate,
+        overall_score: aiAnalysisResults.overallScore,
+        weighted_score: aiAnalysisResults.weightedScore,
 
         // Performance Insights
         performance_level: insights.performance_level,
@@ -177,7 +174,7 @@ export class DataOrganizationService {
         metadata: {
           user_id: userId,
           trigger_type: triggerType,
-          version: "2.0", // Updated version with enhanced scoring
+          version: "2.0",
           total_prompts: processedPromptResults.length,
           successful_prompts: processedPromptResults.filter(
             (p) => p.status === "success"

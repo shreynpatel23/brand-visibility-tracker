@@ -1,8 +1,6 @@
 import { AIModel, AnalysisStage } from "@/types/brand";
-import { PromptService, ProcessedPrompt } from "./promptService";
-import { ScoringService, ScoringResult } from "./scoringService";
+import { PromptService } from "./promptService";
 
-// Simplified AI service focused on accurate matrix generation
 export class AIService {
   // AI API configuration
   private static readonly API_KEYS = {
@@ -17,163 +15,253 @@ export class AIService {
     Gemini: process.env.GEMINI_API_URL!,
   };
 
+  // Stage-specific classification scoring system
+  private static readonly STAGE_CLASSIFICATIONS = {
+    TOFU: {
+      mentioned: {
+        1: 100,
+        2: 75,
+        3: 50,
+        4: 25,
+        5: 10,
+      },
+      not_mentioned: 0,
+    },
+    MOFU: {
+      mofu_positive: 100,
+      mofu_conditional: 75,
+      mofu_neutral: 50,
+      mofu_negative: 25,
+      mofu_absent: 0,
+    },
+    BOFU: {
+      bofu_yes: 100,
+      bofu_partial: 75,
+      bofu_unclear: 50,
+      bofu_no: 25,
+      bofu_absent: 0,
+    },
+    EVFU: {
+      evfu_recommend: 100,
+      evfu_caveat: 75,
+      evfu_neutral: 50,
+      evfu_negative: 25,
+      evfu_absent: 0,
+    },
+  } as const;
+
   /**
-   * Create a structured prompt that ensures AI provides all required metrics
+   * Calculate score based on stage and classification
    */
-  private static createStructuredPrompt(basePrompt: string): string {
-    return `${basePrompt}
+  private static calculateScore(
+    stage: string,
+    classification: string,
+    mentionPosition?: number
+  ): number {
+    const stageKey = stage as keyof typeof this.STAGE_CLASSIFICATIONS;
 
-IMPORTANT: Please provide your analysis in this EXACT format:
+    if (!this.STAGE_CLASSIFICATIONS[stageKey]) {
+      return 0;
+    }
 
-SCORE: [Provide a numerical score from 0-100 for brand performance/visibility. If there is a comparision please provide the comparison score.]
-SENTIMENT: [Must be exactly one of: positive, neutral, negative]
-CONFIDENCE: [Your confidence level in this analysis from 0-100]
-MENTION_POSITION: [If the brand is mentioned, what position/rank? Use 1-5, or 0 if not mentioned. If there is a comparision please provide the comparison position.]
-POSITIVE_PERCENTAGE: [Percentage of positive sentiment, 0-100]
-NEUTRAL_PERCENTAGE: [Percentage of neutral sentiment, 0-100]
-NEGATIVE_PERCENTAGE: [Percentage of negative sentiment, 0-100]
-STRONGLY_POSITIVE_PERCENTAGE: [Percentage of strongly positive sentiment, 0-100]
+    // Special handling for TOFU stage - position-based scoring
+    if (stage === "TOFU") {
+      const tofuClassifications = this.STAGE_CLASSIFICATIONS.TOFU;
+      if (
+        classification === "mentioned" &&
+        mentionPosition &&
+        mentionPosition >= 1 &&
+        mentionPosition <= 5
+      ) {
+        return tofuClassifications.mentioned[
+          mentionPosition as keyof typeof tofuClassifications.mentioned
+        ];
+      }
+      if (classification === "not_mentioned") {
+        return tofuClassifications.not_mentioned;
+      }
+      return 0;
+    }
 
-ANALYSIS:
-[Your detailed analysis here]
-
-Please ensure all numerical values are clearly specified and percentages add up to 100.`;
+    // For other stages, use direct classification mapping
+    const stageClassifications = this.STAGE_CLASSIFICATIONS[stageKey];
+    const classificationKey =
+      classification as keyof typeof stageClassifications;
+    return (stageClassifications as any)[classificationKey] || 0;
   }
 
   /**
-   * Parse AI response to extract structured data
+   * Get stage-specific analysis instructions
    */
-  private static parseAIResponse(response: string): {
-    score: number;
-    sentiment: {
-      overall: "positive" | "neutral" | "negative";
-      confidence: number;
-      distribution: {
-        positive: number;
-        neutral: number;
-        negative: number;
-        strongly_positive: number;
-      };
-    };
-    mentionPosition: number;
-    analysis: string;
-  } {
-    try {
-      const parsed = JSON.parse(response);
+  private static getStageSpecificInstructions(stage: string): string {
+    switch (stage) {
+      case "TOFU":
+        return `Focus on *brand awareness*, *visibility*, and *recognition*. Determine the brand's position when mentioned in lists or discussions. Position matters significantly for scoring.`;
+      case "MOFU":
+        return `Focus on *brand consideration* and *evaluation versus competitors*. Assess how the brand is perceived in comparison contexts and shortlist discussions.`;
+      case "BOFU":
+        return `Focus on *purchase intent* and *decision factors*. Determine if the brand is chosen, recommended, or rejected based on trust, pricing, or quality factors.`;
+      case "EVFU":
+        return `Focus on *post-purchase experience*, *loyalty*, and *advocacy potential*. Assess satisfaction levels, repeat usage indicators, and recommendation likelihood.`;
+      default:
+        return `Analyze general brand perception and positioning in the response.`;
+    }
+  }
 
-      return {
-        score: Math.min(Math.max(parsed.score ?? 0, 0), 100),
-        sentiment: {
-          overall:
-            (parsed.sentiment?.toLowerCase() as
-              | "positive"
-              | "neutral"
-              | "negative") || "neutral",
-          confidence: Math.min(Math.max(parsed.confidence ?? 50, 0), 100),
-          distribution: {
-            positive: parsed.positivePercentage ?? 0,
-            neutral: parsed.neutralPercentage ?? 0,
-            negative: parsed.negativePercentage ?? 0,
-            strongly_positive: parsed.stronglyPositivePercentage ?? 0,
-          },
+  /**
+   * Get classification guidelines for each stage
+   */
+  private static getClassificationGuidelines(stage: string): string {
+    switch (stage) {
+      case "TOFU":
+        return `
+    ### Classification Guidelines - TOFU (Brand Awareness)
+    - "mentioned" → brand is mentioned in the response (position determines score: 1st=100, 2nd=75, 3rd=50, 4th=25, 5th=10)
+    - "not_mentioned" → brand is not mentioned at all (score=0)`;
+      case "MOFU":
+        return `
+    ### Classification Guidelines - MOFU (Consideration)
+    - "mofu_positive" → strong brand consideration, compared favorably vs competitors (score=100)
+    - "mofu_conditional" → considered under some conditions or with caveats (score=75)
+    - "mofu_neutral" → neutral perception, mentioned without strong preference (score=50)
+    - "mofu_negative" → unfavorable perception or weak consideration (score=25)
+    - "mofu_absent" → not mentioned in consideration context (score=0)`;
+      case "BOFU":
+        return `
+    ### Classification Guidelines - BOFU (Purchase Intent)
+    - "bofu_yes" → clear purchase intent or strong preference indicated (score=100)
+    - "bofu_partial" → some indicators of interest or partial preference (score=75)
+    - "bofu_unclear" → uncertain or ambiguous purchase signals (score=50)
+    - "bofu_no" → unlikely to purchase or rejected (score=25)
+    - "bofu_absent" → not mentioned in purchase context (score=0)`;
+      case "EVFU":
+        return `
+    ### Classification Guidelines - EVFU (Post-Purchase/Advocacy)
+    - "evfu_recommend" → strong advocacy, positive experience, clear recommendation (score=100)
+    - "evfu_caveat" → recommends with caveats or mentions minor issues (score=75)
+    - "evfu_neutral" → mixed or indifferent post-purchase sentiment (score=50)
+    - "evfu_negative" → poor experience or dissatisfaction expressed (score=25)
+    - "evfu_absent" → not mentioned in post-purchase context (score=0)`;
+      default:
+        return `
+    ### Classification Guidelines - General
+    - Classify based on overall brand perception in the response`;
+    }
+  }
+
+  /**
+   * Create a structured prompt that ensures AI provides all required metrics
+   */
+  private static readonly systemMessage =
+    "You are a helpful assistant tasked with answering business discovery questions using general market knowledge and inference.\nWhen possible, respond in the form of a ranked list of exactly 5 options.\nRank them in order of relevance, prominence, or likelihood.\nIf you are unfamiliar with any specific brands, provide comparable examples or general best practices.\nAvoid discussing your training data or knowledge cutoff unless specifically asked.\nDo not explain the ranking unless explicitly instructed.\nAvoid using hedge words like 'likely', 'probably', 'seems', 'appears' - be direct and confident in your assessments.";
+
+  /**
+   * Parse AI response to extract structured data with proper stage-specific scoring
+   */
+  private static async parseAIResponse(
+    data: string,
+    brandName: string,
+    stage?: string
+  ): Promise<any> {
+    const stageInstructions = this.getStageSpecificInstructions(
+      stage || "Unknown"
+    );
+
+    const analysisPrompt = `
+    You are an expert marketing analyst trained to evaluate brand performance across different stages of the marketing funnel.
+    
+    Your task is to analyze the following AI-generated response and assess how the brand "${brandName}" is mentioned, perceived, and positioned.
+    
+    ### Context
+    Analysis Stage: ${stage || "Unknown"}
+    ${stageInstructions}
+    
+    ### Response to Analyze
+    "${data}"
+    
+    ### Output Format
+    Return a **strict JSON** object:
+    {
+      "sentiment": {
+        "distribution": {
+          "positive": number,
+          "neutral": number,
+          "negative": number,
+          "strongly_positive": number
         },
-        mentionPosition: Math.min(Math.max(parsed.mentionPosition ?? 0, 0), 5),
-        analysis: parsed.analysis ?? "No analysis provided",
-      };
-    } catch (error) {
-      console.log("Error parsing AI response:", error);
-      // Extract score
-      const scoreMatch = response.match(/SCORE:\s*(\d+)/i);
-      const score = scoreMatch
-        ? Math.min(Math.max(parseInt(scoreMatch[1]), 0), 100)
-        : 0;
+        "overall": "positive" | "neutral" | "negative",
+        "confidence": number  // 0–100
+      },
+      "mentionPosition": number,  // Position of brand mention (1–5), or 0 if absent
+      "stage_specific_classification": string,  // Use the appropriate label from guidelines below
+      "analysis": string  // Detailed analysis including performance summary and recommendations
+    }
+    
+    ${this.getClassificationGuidelines(stage || "Unknown")}
+    
+    ### Rules
+    - If the brand is **not mentioned**, set mentionPosition = 0 and use appropriate "absent/not_mentioned" classification
+    - Always include reasoning in **analysis** describing why the classification and sentiment were chosen
+    - Avoid adding any explanatory text outside the JSON
+    `;
 
-      // Extract sentiment
-      const sentimentMatch = response.match(
-        /SENTIMENT:\s*(positive|neutral|negative)/i
-      );
-      const overall =
-        (sentimentMatch?.[1]?.toLowerCase() as
-          | "positive"
-          | "neutral"
-          | "negative") || "neutral";
+    try {
+      const response = await fetch(this.AI_ENDPOINTS.ChatGPT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.API_KEYS.ChatGPT}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [{ role: "user", content: analysisPrompt }],
+          max_tokens: 1000,
+        }),
+      });
 
-      // Extract confidence
-      const confidenceMatch = response.match(/CONFIDENCE:\s*(\d+)/i);
-      const confidence = confidenceMatch
-        ? Math.min(Math.max(parseInt(confidenceMatch[1]), 0), 100)
-        : 50;
-
-      // Extract mention position
-      const positionMatch = response.match(/MENTION_POSITION:\s*(\d+)/i);
-      const mentionPosition = positionMatch
-        ? Math.min(Math.max(parseInt(positionMatch[1]), 0), 5)
-        : 0;
-
-      // Extract sentiment percentages
-      const positiveMatch = response.match(/POSITIVE_PERCENTAGE:\s*(\d+)/i);
-      const neutralMatch = response.match(/NEUTRAL_PERCENTAGE:\s*(\d+)/i);
-      const negativeMatch = response.match(/NEGATIVE_PERCENTAGE:\s*(\d+)/i);
-      const stronglyPositiveMatch = response.match(
-        /STRONGLY_POSITIVE_PERCENTAGE:\s*(\d+)/i
-      );
-
-      let positive = positiveMatch ? parseInt(positiveMatch[1]) : 0;
-      let neutral = neutralMatch ? parseInt(neutralMatch[1]) : 0;
-      let negative = negativeMatch ? parseInt(negativeMatch[1]) : 0;
-      let strongly_positive = stronglyPositiveMatch
-        ? parseInt(stronglyPositiveMatch[1])
-        : 0;
-
-      // Normalize percentages to ensure they add up to 100
-      const total = positive + neutral + negative;
-      if (total > 0) {
-        positive = Math.round((positive / total) * 100);
-        neutral = Math.round((neutral / total) * 100);
-        negative = Math.round((negative / total) * 100);
-        strongly_positive = Math.round((strongly_positive / total) * 100);
-      } else {
-        // Default distribution based on overall sentiment
-        switch (overall) {
-          case "positive":
-            positive = 0;
-            neutral = 0;
-            negative = 0;
-            strongly_positive = 0;
-            break;
-          case "negative":
-            positive = 0;
-            neutral = 0;
-            negative = 0;
-            strongly_positive = 0;
-            break;
-          default:
-            positive = 0;
-            neutral = 0;
-            negative = 0;
-            strongly_positive = 0;
-        }
+      if (!response.ok) {
+        throw new Error(
+          `ChatGPT API error: ${response.status} ${response.statusText}`
+        );
       }
 
-      // Extract analysis
-      const analysisMatch = response.match(/ANALYSIS:\s*([\s\S]*)/i);
-      const analysis = analysisMatch?.[1]?.trim() || "No analysis provided";
+      const res = await response.json();
+      const parsedData = JSON.parse(res.choices[0].message.content);
+
+      // Calculate score based on stage and classification
+      const calculatedScore = this.calculateScore(
+        stage || "Unknown",
+        parsedData.stage_specific_classification || "not_mentioned",
+        parsedData.mentionPosition
+      );
 
       return {
-        score,
+        score: calculatedScore,
+        position_weighted_score: calculatedScore,
         sentiment: {
-          overall,
-          confidence,
           distribution: {
-            positive,
-            neutral,
-            negative,
-            strongly_positive,
+            positive: parsedData.sentiment?.distribution?.positive || 0,
+            neutral: parsedData.sentiment?.distribution?.neutral || 0,
+            negative: parsedData.sentiment?.distribution?.negative || 0,
+            strongly_positive:
+              parsedData.sentiment?.distribution?.strongly_positive || 0,
           },
+          overall: parsedData.sentiment?.overall || "neutral",
+          confidence: parsedData.sentiment?.confidence || 0,
         },
-        mentionPosition,
-        analysis,
+        mentionPosition: parsedData.mentionPosition || 0,
+        stage_specific_classification:
+          parsedData.stage_specific_classification || "not_mentioned",
+        analysis:
+          `AI Response: ${data}\n\nAnalysis: ${parsedData.analysis}` ||
+          "No analysis provided",
       };
+    } catch (error) {
+      throw new Error(
+        `ChatGPT API error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 
@@ -200,10 +288,10 @@ Please ensure all numerical values are clearly specified and percentages add up 
         body: JSON.stringify({
           model: "gpt-3.5-turbo",
           messages: [
-            { role: "user", content: this.createStructuredPrompt(prompt) },
+            { role: "system", content: this.systemMessage },
+            { role: "user", content: prompt },
           ],
-          max_tokens: 800,
-          temperature: 0.3, // Lower temperature for more consistent responses
+          max_tokens: 1000,
         }),
       });
 
@@ -250,11 +338,9 @@ Please ensure all numerical values are clearly specified and percentages add up 
         },
         body: JSON.stringify({
           model: "claude-3-5-sonnet-20240620",
-          max_tokens: 800,
-          messages: [
-            { role: "user", content: this.createStructuredPrompt(prompt) },
-          ],
-          temperature: 0.3,
+          max_tokens: 1000,
+          system: this.systemMessage,
+          messages: [{ role: "user", content: prompt }],
         }),
       });
 
@@ -291,6 +377,9 @@ Please ensure all numerical values are clearly specified and percentages add up 
       throw new Error("Gemini API key not configured");
     }
 
+    const geminiPrompt = `${this.systemMessage}
+    ${prompt}`;
+
     try {
       const response = await fetch(this.AI_ENDPOINTS.Gemini, {
         method: "POST",
@@ -299,79 +388,7 @@ Please ensure all numerical values are clearly specified and percentages add up 
           "x-goog-api-key": this.API_KEYS.Gemini,
         },
         body: JSON.stringify({
-          contents: [
-            { parts: [{ text: this.createStructuredPrompt(prompt) }] },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                score: {
-                  type: "INTEGER",
-                  description: "Brand performance score from 0-100",
-                },
-                sentiment: {
-                  type: "STRING",
-                  enum: ["positive", "neutral", "negative"],
-                  description: "Overall sentiment analysis",
-                },
-                confidence: {
-                  type: "INTEGER",
-                  description: "Confidence level in this analysis from 0-100",
-                },
-                mentionPosition: {
-                  type: "INTEGER",
-                  description:
-                    "If the brand is mentioned, what position/rank? Use 1-5, or 0 if not mentioned",
-                },
-                positivePercentage: {
-                  type: "INTEGER",
-                  description: "Percentage of positive sentiment, 0-100",
-                },
-                negativePercentage: {
-                  type: "INTEGER",
-                  description: "Percentage of negative sentiment, 0-100",
-                },
-                stronglyPositivePercentage: {
-                  type: "INTEGER",
-                  description:
-                    "Percentage of strongly positive sentiment, 0-100",
-                },
-                neutralPercentage: {
-                  type: "INTEGER",
-                  description: "Percentage of neutral sentiment, 0-100",
-                },
-                analysis: {
-                  type: "STRING",
-                  description: "Detailed analysis text",
-                },
-              },
-              required: [
-                "score",
-                "sentiment",
-                "confidence",
-                "mentionPosition",
-                "positivePercentage",
-                "negativePercentage",
-                "stronglyPositivePercentage",
-                "neutralPercentage",
-                "analysis",
-              ],
-              propertyOrdering: [
-                "score",
-                "sentiment",
-                "confidence",
-                "mentionPosition",
-                "positivePercentage",
-                "negativePercentage",
-                "stronglyPositivePercentage",
-                "neutralPercentage",
-                "analysis",
-              ],
-            },
-          },
+          contents: [{ parts: [{ text: geminiPrompt }] }],
         }),
       });
 
@@ -400,9 +417,12 @@ Please ensure all numerical values are clearly specified and percentages add up 
    */
   public static async analyzeBrand(
     model: AIModel,
-    prompt: string
+    prompt: string,
+    brandName: string,
+    stage?: string
   ): Promise<{
     score: number;
+    position_weighted_score: number;
     response: string;
     responseTime: number;
     sentiment: {
@@ -416,6 +436,7 @@ Please ensure all numerical values are clearly specified and percentages add up 
       };
     };
     mentionPosition: number;
+    stage_specific_classification: string;
     analysis: string;
     status: "success" | "error";
   }> {
@@ -437,15 +458,21 @@ Please ensure all numerical values are clearly specified and percentages add up 
           throw new Error(`Unsupported AI model: ${model}`);
       }
 
-      // Parse the structured response
-      const parsedData = this.parseAIResponse(aiResponse.response);
+      // Parse the structured response with AI-generated weighted scores
+      const parsedData = await this.parseAIResponse(
+        aiResponse.response,
+        brandName,
+        stage
+      );
 
       return {
         score: parsedData.score,
+        position_weighted_score: parsedData.position_weighted_score,
         response: aiResponse.response,
         responseTime: aiResponse.responseTime,
         sentiment: parsedData.sentiment,
         mentionPosition: parsedData.mentionPosition,
+        stage_specific_classification: parsedData.stage_specific_classification,
         analysis: parsedData.analysis,
         status: "success",
       };
@@ -453,6 +480,7 @@ Please ensure all numerical values are clearly specified and percentages add up 
       console.error(`AI Analysis Error for ${model}:`, error);
       return {
         score: 0,
+        position_weighted_score: 0,
         response: `Analysis failed: ${
           error instanceof Error ? error.message : "Unknown error"
         }`,
@@ -468,32 +496,11 @@ Please ensure all numerical values are clearly specified and percentages add up 
           },
         },
         mentionPosition: 0,
+        stage_specific_classification: "not_mentioned",
         analysis: "Analysis failed due to API error",
         status: "error",
       };
     }
-  }
-
-  /**
-   * Calculate comprehensive weighted score using enhanced scoring service
-   */
-  private static calculateWeightedScore(
-    score: number,
-    mentionPosition: number,
-    stage: AnalysisStage,
-    prompt: ProcessedPrompt,
-    sentiment: {
-      overall: "positive" | "neutral" | "negative";
-      confidence: number;
-    }
-  ): ScoringResult {
-    return ScoringService.calculateWeightedScore(
-      score,
-      mentionPosition,
-      stage,
-      prompt,
-      sentiment
-    );
   }
 
   /**
@@ -569,37 +576,31 @@ Please ensure all numerical values are clearly specified and percentages add up 
             brandData
           );
 
-          // Analyze with AI model
+          // Analyze with AI model (AI now calculates weighted scores)
           const analysisResult = await this.analyzeBrand(
             model,
-            processedPromptText
-          );
-
-          // Calculate comprehensive weighted score
-          const scoringResult = this.calculateWeightedScore(
-            analysisResult.score,
-            analysisResult.mentionPosition,
-            stage,
-            prompt,
-            analysisResult.sentiment
+            processedPromptText,
+            brandData.name,
+            stage
           );
 
           promptResults.push({
             promptId: prompt.prompt_id,
             promptText: processedPromptText,
             score: analysisResult.score,
-            weightedScore: scoringResult.position_weighted_score,
+            weightedScore: analysisResult.position_weighted_score,
             mentionPosition: analysisResult.mentionPosition,
             response: analysisResult.analysis,
             responseTime: analysisResult.responseTime,
             sentiment: analysisResult.sentiment,
             status: analysisResult.status,
-            scoringDetails: scoringResult, // Add detailed scoring information
+            stage_specific_classification:
+              analysisResult.stage_specific_classification,
           });
 
           if (analysisResult.status === "success") {
             successfulPrompts++;
-            totalWeightedScore += scoringResult.position_weighted_score;
+            totalWeightedScore += analysisResult.position_weighted_score;
             totalWeightSum += 1;
 
             // Aggregate sentiment data
@@ -642,6 +643,7 @@ Please ensure all numerical values are clearly specified and percentages add up 
               },
             },
             status: "error" as const,
+            stage_specific_classification: "not_mentioned",
           });
         }
       }
@@ -731,47 +733,5 @@ Please ensure all numerical values are clearly specified and percentages add up 
       );
       throw error;
     }
-  }
-
-  /**
-   * Comprehensive multi-prompt analysis across all models and stages
-   */
-  public static async comprehensiveMultiPromptAnalysis(
-    brandData: any,
-    models: AIModel[],
-    stages: AnalysisStage[]
-  ): Promise<
-    Array<{
-      model: AIModel;
-      stage: AnalysisStage;
-      result: Awaited<ReturnType<typeof AIService.analyzeWithMultiplePrompts>>;
-    }>
-  > {
-    const analyses = [];
-
-    for (const model of models) {
-      for (const stage of stages) {
-        try {
-          console.log(`Starting multi-prompt analysis for ${model} - ${stage}`);
-          const result = await this.analyzeWithMultiplePrompts(
-            brandData,
-            model,
-            stage
-          );
-          analyses.push({ model, stage, result });
-
-          // Add delay between model/stage combinations
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        } catch (error) {
-          console.error(
-            `Comprehensive analysis error for ${model}-${stage}:`,
-            error
-          );
-          // Continue with other analyses even if one fails
-        }
-      }
-    }
-
-    return analyses;
   }
 }

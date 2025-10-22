@@ -16,18 +16,10 @@ import {
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { TagInput } from "../tag-input";
 import { deleteData, fetchData, putData } from "@/utils/fetch";
 import ApiError from "../api-error";
 import Loading from "../loading";
-import { CATEGORIES, REGIONS } from "@/constants/onboarding-constants";
 import { toast } from "sonner";
 import { AlertCircle, Trash2 } from "lucide-react";
 import {
@@ -42,8 +34,8 @@ import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   name: z.string().min(1, "Brand name is required"),
-  category: z.string().optional(),
-  region: z.string().optional(),
+  category: z.string().min(1, "Category is required"),
+  region: z.string().min(1, "Region is required"),
   target_audience: z.array(z.string()).optional(),
   competitors: z.array(z.string()).optional(),
   use_case: z.string().optional(),
@@ -196,20 +188,9 @@ export function EditBrandForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl className="w-full">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Input placeholder="Enter category" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -221,20 +202,9 @@ export function EditBrandForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Region</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl className="w-full">
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select region" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {REGIONS.map((reg) => (
-                          <SelectItem key={reg} value={reg}>
-                            {reg}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <Input placeholder="Enter region" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

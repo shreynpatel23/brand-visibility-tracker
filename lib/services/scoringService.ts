@@ -1,4 +1,3 @@
-import { ProcessedPrompt } from "./promptService";
 import { AnalysisStage } from "@/types/brand";
 
 export interface ScoringWeights {
@@ -38,85 +37,6 @@ export interface ScoringResult {
 }
 
 export class ScoringService {
-  /**
-   * Calculate comprehensive weighted score based on CSV scoring mechanism
-   */
-  public static calculateWeightedScore(
-    rawScore: number,
-    mentionPosition: number,
-    stage: AnalysisStage,
-    prompt: ProcessedPrompt,
-    sentiment: {
-      overall: "positive" | "neutral" | "negative";
-      confidence: number;
-    }
-  ): ScoringResult {
-    // Validate and sanitize inputs
-    const sanitizedRawScore = isNaN(rawScore)
-      ? 0
-      : Math.min(Math.max(rawScore, 0), 100);
-    const sanitizedMentionPosition = isNaN(mentionPosition)
-      ? 0
-      : Math.min(Math.max(mentionPosition, 0), 5);
-    const sanitizedConfidence = isNaN(sentiment.confidence)
-      ? 50
-      : Math.min(Math.max(sentiment.confidence, 0), 100);
-
-    let positionWeight = 0;
-    // Make a check here that if the stage is TOFU then the getPositionWeight should calculate the position weight based on the mention position
-    if (stage === "TOFU") {
-      positionWeight = this.getPositionWeight(
-        sanitizedMentionPosition,
-        prompt.weights
-      );
-    } else {
-      positionWeight = this.applyStageSpecificWeighting(stage, {
-        ...sentiment,
-        confidence: sanitizedConfidence,
-      });
-    }
-    // else Apply stage-specific weighting based on CSV weights should be applied
-
-    const positionWeightedScore = sanitizedRawScore * positionWeight;
-
-    // Validate all outputs to prevent NaN
-    return {
-      raw_score: isNaN(sanitizedRawScore) ? 0 : sanitizedRawScore,
-      position_weighted_score: isNaN(positionWeightedScore)
-        ? 0
-        : positionWeightedScore,
-      mention_position: sanitizedMentionPosition,
-      stage_specific_classification: this.getStageSpecificClassification(
-        stage,
-        sentiment,
-        sanitizedMentionPosition
-      ),
-    };
-  }
-
-  /**
-   * Get position weight based on mention position
-   */
-  private static getPositionWeight(
-    mentionPosition: number,
-    weights: ProcessedPrompt["weights"]
-  ): number {
-    switch (mentionPosition) {
-      case 1:
-        return weights.weight_first;
-      case 2:
-        return weights.weight_second;
-      case 3:
-        return weights.weight_third;
-      case 4:
-        return weights.weight_fourth;
-      case 5:
-        return weights.weight_fifth;
-      default:
-        return 0;
-    }
-  }
-
   /**
    * Apply stage-specific weighting based on CSV configuration
    */

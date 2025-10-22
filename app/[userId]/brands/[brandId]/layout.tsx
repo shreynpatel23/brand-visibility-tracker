@@ -267,7 +267,7 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
               </span>
             </nav>
           </div>
-          <div className="ml-auto flex items-center gap-4 lg:gap-6">
+          <div className="ml-auto flex items-center gap-4 lg:gap-8">
             {error && (
               <ApiError
                 message={error}
@@ -281,9 +281,8 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
                 purchaseUrl={`/${userId}/brands/${brandId}/credits/purchase`}
               />
             )}
-            <ModeToggle />
             {user._id && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2 px-2">
                 <div className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-full">
                   <UserCircle stroke="#5e6bc5" />
                 </div>
@@ -297,6 +296,7 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
                 </div>
               </div>
             )}
+            <ModeToggle />
             <Button
               disabled={logoutLoading || loading}
               variant={logoutLoading ? "outline" : "destructive"}
