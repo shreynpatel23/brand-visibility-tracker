@@ -449,7 +449,6 @@ export const POST = async (
 
     // Generate analysis ID for tracking
     const analysisId = `multi-${brandId}-${Date.now()}`;
-    const analysisStartedAt = new Date();
 
     // Create all model-stage combinations (pairs)
     const pairs = [];
@@ -520,19 +519,15 @@ export const POST = async (
     // Start analysis in background
     console.log(`Triggering background analysis for brand ${brand.name}`);
 
-    // Enqueue first QStash job (no cron, just one-time)
-    const [firstPair, ...remainingPairs] = pairs;
-
-    // Schedule recurring jobs every 5 minutes
-    await qstash.publishJSON({
+    // trigger our qstash workflow
+    await qstash.trigger({
       url: webhookUrl,
       body: {
         brandId,
         userId,
         analysisId,
-        currentPair: firstPair,
-        remainingPairs,
-        analysisStartedAt,
+        models: modelsToAnalyze,
+        stages: stagesToAnalyze,
       },
     });
 
