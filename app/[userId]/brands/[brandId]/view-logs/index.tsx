@@ -62,7 +62,7 @@ export default function ViewLogs({
   } = useAnalysisStatus({
     brandId,
     userId,
-    refreshInterval: 30000,
+    refreshInterval: 20000,
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -77,6 +77,9 @@ export default function ViewLogs({
   const [limit] = useState(10); // setLimit removed as not currently used
   const [sortBy, setSortBy] = useState("createdAt");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [expandedResponses, setExpandedResponses] = useState<Set<string>>(
+    new Set()
+  );
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [showAnalysisSelectorModal, setShowAnalysisSelectorModal] =
     useState(false);
@@ -113,6 +116,77 @@ export default function ViewLogs({
       newExpanded.add(logId);
     }
     setExpandedRows(newExpanded);
+  };
+
+  // Helper function to toggle response expansion
+  const toggleResponseExpansion = (responseId: string) => {
+    const newExpanded = new Set(expandedResponses);
+    if (newExpanded.has(responseId)) {
+      newExpanded.delete(responseId);
+    } else {
+      newExpanded.add(responseId);
+    }
+    setExpandedResponses(newExpanded);
+  };
+
+  // Helper function to parse markdown text
+  const parseMarkdown = (text: string) => {
+    // Parse bold text (**text**)
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = boldRegex.exec(text)) !== null) {
+      // Add text before the bold part
+      if (match.index > lastIndex) {
+        parts.push({
+          type: "text",
+          content: text.slice(lastIndex, match.index),
+        });
+      }
+
+      // Add the bold part
+      parts.push({
+        type: "bold",
+        content: match[1],
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push({
+        type: "text",
+        content: text.slice(lastIndex),
+      });
+    }
+
+    return parts.length > 0 ? parts : [{ type: "text", content: text }];
+  };
+
+  // Helper function to render parsed markdown
+  const renderMarkdownText = (text: string, key: string) => {
+    const parts = parseMarkdown(text);
+
+    return (
+      <span key={key}>
+        {parts.map((part, index) => {
+          if (part.type === "bold") {
+            return (
+              <strong
+                key={index}
+                className="font-semibold text-gray-900 dark:text-white"
+              >
+                {part.content}
+              </strong>
+            );
+          }
+          return <span key={index}>{part.content}</span>;
+        })}
+      </span>
+    );
   };
 
   const fetchLogsData = useCallback(async () => {
@@ -708,9 +782,280 @@ export default function ViewLogs({
                                           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                             {prompt.promptText}
                                           </p>
-                                          <p className="text-xs text-gray-500 dark:text-gray-500 line-clamp-2">
-                                            {prompt.response}
-                                          </p>
+                                          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border relative">
+                                            <div className="flex items-center justify-between mb-3">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                                  LLM Response
+                                                </span>
+                                                {!expandedResponses.has(
+                                                  `response-${prompt.promptId}-${promptIndex}`
+                                                ) && (
+                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700">
+                                                    <svg
+                                                      className="w-3 h-3 mr-1"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      viewBox="0 0 24 24"
+                                                    >
+                                                      <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M19 9l-7 7-7-7"
+                                                      />
+                                                    </svg>
+                                                    Truncated
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <button
+                                                onClick={() => {
+                                                  const responseId = `response-${prompt.promptId}-${promptIndex}`;
+                                                  toggleResponseExpansion(
+                                                    responseId
+                                                  );
+                                                }}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                                              >
+                                                {expandedResponses.has(
+                                                  `response-${prompt.promptId}-${promptIndex}`
+                                                ) ? (
+                                                  <>
+                                                    <svg
+                                                      className="w-4 h-4"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      viewBox="0 0 24 24"
+                                                    >
+                                                      <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M5 15l7-7 7 7"
+                                                      />
+                                                    </svg>
+                                                    <span>Show Less</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <svg
+                                                      className="w-4 h-4"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      viewBox="0 0 24 24"
+                                                    >
+                                                      <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M19 9l-7 7-7-7"
+                                                      />
+                                                    </svg>
+                                                    <span>
+                                                      Show Full Response
+                                                    </span>
+                                                  </>
+                                                )}
+                                              </button>
+                                            </div>
+                                            <div className="relative">
+                                              <div
+                                                id={`response-${prompt.promptId}-${promptIndex}`}
+                                                className={`text-sm text-gray-700 dark:text-gray-300 leading-relaxed transition-all duration-300 ${
+                                                  expandedResponses.has(
+                                                    `response-${prompt.promptId}-${promptIndex}`
+                                                  )
+                                                    ? "max-h-none"
+                                                    : "max-h-18 overflow-hidden"
+                                                }`}
+                                                style={{
+                                                  maxHeight:
+                                                    expandedResponses.has(
+                                                      `response-${prompt.promptId}-${promptIndex}`
+                                                    )
+                                                      ? "none"
+                                                      : "4.5rem",
+                                                }}
+                                              >
+                                                {prompt.response
+                                                  .split("\n")
+                                                  .map(
+                                                    (
+                                                      line: string,
+                                                      lineIndex: number,
+                                                      allLines: string[]
+                                                    ) => {
+                                                      // Handle numbered lists (including standalone numbers and various formats)
+                                                      const numberedMatch =
+                                                        line.match(
+                                                          /^(\d+)\.?\s*(.+)/
+                                                        ) || // "1. Content" or "1 Content"
+                                                        line.match(
+                                                          /^(\d+)\s*$/
+                                                        ) || // Standalone "1"
+                                                        line.match(
+                                                          /^\s*(\d+)\.?\s*(.+)/
+                                                        ) || // "  1. Content" (with leading spaces)
+                                                        (line
+                                                          .trim()
+                                                          .match(/^\d+$/) &&
+                                                        lineIndex >= 0
+                                                          ? [
+                                                              line.trim(),
+                                                              line.trim(),
+                                                              "",
+                                                            ]
+                                                          : null);
+
+                                                      // Check if this is a standalone number followed by content on next line
+                                                      const isStandaloneNumber =
+                                                        line
+                                                          .trim()
+                                                          .match(/^\d+$/);
+                                                      if (
+                                                        isStandaloneNumber &&
+                                                        lineIndex <
+                                                          allLines.length - 1
+                                                      ) {
+                                                        const nextLine =
+                                                          allLines[
+                                                            lineIndex + 1
+                                                          ];
+                                                        if (
+                                                          nextLine &&
+                                                          nextLine.trim()
+                                                        ) {
+                                                          return (
+                                                            <div
+                                                              key={lineIndex}
+                                                              className="flex items-start gap-3 mb-3 mt-2"
+                                                            >
+                                                              <span className="flex-shrink-0 w-7 h-7 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-semibold flex items-center justify-center">
+                                                                {line.trim()}
+                                                              </span>
+                                                              <div className="flex-1 pt-0.5">
+                                                                {renderMarkdownText(
+                                                                  nextLine.trim(),
+                                                                  `${lineIndex}-next`
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                          );
+                                                        }
+                                                      }
+
+                                                      // Skip the next line if current line was a standalone number
+                                                      const prevLine =
+                                                        lineIndex > 0
+                                                          ? allLines[
+                                                              lineIndex - 1
+                                                            ]
+                                                          : "";
+                                                      if (
+                                                        prevLine
+                                                          .trim()
+                                                          .match(/^\d+$/) &&
+                                                        line.trim()
+                                                      ) {
+                                                        return null; // Skip this line as it's already rendered with the number
+                                                      }
+
+                                                      if (
+                                                        numberedMatch &&
+                                                        !isStandaloneNumber
+                                                      ) {
+                                                        return (
+                                                          <div
+                                                            key={lineIndex}
+                                                            className="flex items-start gap-3 mb-2"
+                                                          >
+                                                            <span className="flex-shrink-0 w-7 h-7 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-semibold flex items-center justify-center">
+                                                              {numberedMatch[1]}
+                                                            </span>
+                                                            <div className="flex-1 pt-0.5">
+                                                              {renderMarkdownText(
+                                                                numberedMatch[2] ||
+                                                                  "",
+                                                                `${lineIndex}-content`
+                                                              )}
+                                                            </div>
+                                                          </div>
+                                                        );
+                                                      }
+
+                                                      // Handle recommendation section
+                                                      if (
+                                                        line
+                                                          .toLowerCase()
+                                                          .includes(
+                                                            "recommendation:"
+                                                          )
+                                                      ) {
+                                                        const recommendationText =
+                                                          line.replace(
+                                                            /recommendation:\s*/i,
+                                                            ""
+                                                          );
+                                                        return (
+                                                          <div
+                                                            key={lineIndex}
+                                                            className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 dark:border-amber-500 rounded-r-lg"
+                                                          >
+                                                            <div className="flex items-start gap-3">
+                                                              <span className="text-amber-600 dark:text-amber-400 font-medium text-sm mt-0.5">
+                                                                💡
+                                                              </span>
+                                                              <div className="flex-1">
+                                                                <div className="text-amber-700 dark:text-amber-300 font-semibold text-xs uppercase tracking-wide mb-1">
+                                                                  Recommendation
+                                                                </div>
+                                                                <div className="text-amber-800 dark:text-amber-200 text-sm leading-relaxed">
+                                                                  {renderMarkdownText(
+                                                                    recommendationText,
+                                                                    `${lineIndex}-rec`
+                                                                  )}
+                                                                </div>
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                        );
+                                                      }
+
+                                                      // Handle empty lines
+                                                      if (line.trim() === "") {
+                                                        return (
+                                                          <div
+                                                            key={lineIndex}
+                                                            className="h-2"
+                                                          />
+                                                        );
+                                                      }
+
+                                                      // Regular text
+                                                      return (
+                                                        <div
+                                                          key={lineIndex}
+                                                          className="mb-1 leading-relaxed"
+                                                        >
+                                                          {renderMarkdownText(
+                                                            line,
+                                                            `${lineIndex}-text`
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    }
+                                                  )
+                                                  .filter(Boolean)}
+                                              </div>
+                                              {/* Fade gradient overlay when truncated */}
+                                              {!expandedResponses.has(
+                                                `response-${prompt.promptId}-${promptIndex}`
+                                              ) && (
+                                                <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-gray-50 dark:from-gray-800 to-transparent pointer-events-none"></div>
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
                                         <div className="text-right ml-4">
                                           <div className="text-sm font-medium text-gray-900 dark:text-white">

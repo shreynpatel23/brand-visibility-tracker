@@ -6,7 +6,7 @@ import { RouteParams, UserBrandParams } from "@/types/api";
 
 function SuspenseFallback() {
   return (
-    <div className="w-screen h-screen flex iems-center justify-center">
+    <div className="w-screen h-screen flex items-center justify-center">
       <Loading message="Loading invite member page..." />
     </div>
   );

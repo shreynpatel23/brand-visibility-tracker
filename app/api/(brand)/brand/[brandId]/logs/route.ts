@@ -12,6 +12,11 @@ import { CreditService } from "@/lib/services/creditService";
 import { qstash } from "@/lib/qstash";
 import AnalysisStatus from "@/lib/models/analysisStatus";
 import AnalysisPair from "@/lib/models/analysisPair";
+import User from "@/lib/models/user";
+import { AIService } from "@/lib/services/aiService";
+import { DataOrganizationService } from "@/lib/services/dataOrganizationService";
+import { analysisCompletionEmailTemplate } from "@/utils/analysisCompletionEmailTemplate";
+import { sendEmail } from "@/utils/sendEmail";
 
 const LogsQuerySchema = z.object({
   userId: z.string().min(1, "User ID is required"),
@@ -42,6 +47,125 @@ const TriggerAnalysisSchema = z.object({
   models: z.array(z.enum(["ChatGPT", "Claude", "Gemini"])).optional(),
   stages: z.array(z.enum(["TOFU", "MOFU", "BOFU", "EVFU"])).optional(),
 });
+
+async function runFullAnalysis({
+  brandId,
+  userId,
+  analysisId,
+  models,
+  stages,
+}: {
+  brandId: string;
+  userId: string;
+  analysisId: string;
+  models: AIModel[];
+  stages: AnalysisStage[];
+}) {
+  // 1. Connect DB
+  await connect();
+
+  // 2. Check status
+  const currentAnalysis = await AnalysisStatus.findOne({
+    analysis_id: analysisId,
+  });
+  if (!currentAnalysis || currentAnalysis.status !== "running") return;
+
+  // 3. Fetch brand + user
+  const brand = await Brand.findById(brandId);
+  const user = await User.findById(userId);
+  if (!brand || !user) throw new Error("Brand or user not found");
+
+  // 4. Process each model-stage combo
+  for (const model of models) {
+    for (const stage of stages) {
+      console.log(`Running analysis for ${model}-${stage}`);
+
+      await AnalysisStatus.findOneAndUpdate(
+        { analysis_id: analysisId },
+        {
+          $set: {
+            "progress.current_task": `Running analysis for ${model}-${stage}`,
+          },
+        }
+      );
+
+      await AnalysisPair.findOneAndUpdate(
+        { analysis_id: analysisId, model, stage },
+        { status: "running" }
+      );
+
+      const result = await AIService.analyzeWithMultiplePrompts(
+        brand,
+        model,
+        stage
+      );
+      if (!result) throw new Error("AI result empty");
+
+      await DataOrganizationService.processAndStoreAnalysis(
+        brandId,
+        model,
+        stage,
+        result,
+        userId,
+        "manual"
+      );
+
+      await AnalysisPair.findOneAndUpdate(
+        { analysis_id: analysisId, model, stage },
+        { status: "completed" }
+      );
+
+      await AnalysisStatus.updateOne(
+        { analysis_id: analysisId },
+        { $inc: { "progress.completed_tasks": 1 } }
+      );
+    }
+  }
+
+  // 5. Finalize and send email
+  const results = await MultiPromptAnalysis.find({
+    brand_id: new Types.ObjectId(brandId),
+    createdAt: { $gte: currentAnalysis.started_at },
+  });
+
+  const totalAnalyses = results.length;
+  const avgScore = totalAnalyses
+    ? results.reduce((s, r) => s + r.overall_score, 0) / totalAnalyses
+    : 0;
+  const avgWeightedScore = totalAnalyses
+    ? results.reduce((s, r) => s + r.weighted_score, 0) / totalAnalyses
+    : 0;
+
+  await AnalysisStatus.updateOne(
+    { analysis_id: analysisId },
+    {
+      $set: {
+        status: "completed",
+        "progress.current_task": "All analyses completed",
+      },
+    }
+  );
+
+  const dashboardLink = `${process.env.NEXT_PUBLIC_BASE_URL}/${userId}/brands/${brandId}/dashboard`;
+  const emailTemplate = analysisCompletionEmailTemplate(
+    brand.name,
+    dashboardLink,
+    {
+      totalAnalyses,
+      averageScore: Math.round(avgScore * 100) / 100,
+      averageWeightedScore: Math.round(avgWeightedScore * 100) / 100,
+      completionTime: Date.now() - currentAnalysis.started_at.getTime(),
+    }
+  );
+
+  await sendEmail(
+    user.email,
+    `Analysis Complete - ${brand.name}`,
+    emailTemplate
+  );
+
+  console.log(`🎉 Analysis ${analysisId} completed successfully!`);
+}
 
 // Brand analysis logs API
 export const GET = async (
@@ -508,6 +632,39 @@ export const POST = async (
           message: "Error processing credits. Please try again.",
         }),
         { status: 500 }
+      );
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      runFullAnalysis({
+        brandId,
+        userId,
+        analysisId,
+        models: modelsToAnalyze,
+        stages: stagesToAnalyze,
+      });
+
+      // Return immediate response
+      return new NextResponse(
+        JSON.stringify({
+          success: true,
+          message:
+            "Analysis started successfully! You will receive an email notification once the analysis is complete.",
+          data: {
+            analysisId,
+            status: "started",
+            estimatedCompletionTime: "5-10 minutes",
+            notificationEmail:
+              "You will receive an email when analysis is complete",
+            creditsUsed: validation.creditsNeeded,
+            modelsAnalyzed: modelsToAnalyze,
+            stagesAnalyzed: stagesToAnalyze,
+          },
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
       );
     }
 

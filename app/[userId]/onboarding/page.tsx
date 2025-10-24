@@ -6,7 +6,7 @@ import { RouteParams, UserParams } from "@/types/api";
 
 function SuspenseFallback() {
   return (
-    <div className="w-screen h-screen flex iems-center justify-center">
+    <div className="w-screen h-screen flex items-center justify-center">
       <Loading message="Loading onboarding form..." />
     </div>
   );

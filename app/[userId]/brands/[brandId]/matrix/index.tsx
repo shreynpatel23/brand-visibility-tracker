@@ -1,15 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  Filter,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  BarChart3,
-  Target,
-  Activity,
-} from "lucide-react";
+import { Filter, TrendingUp, BarChart3, Target, Activity } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -188,28 +180,6 @@ const MatrixPage = ({
     return "text-red-700 dark:text-red-400";
   };
 
-  const getTrendIcon = (trend: "up" | "down" | "neutral") => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="w-4 h-4 text-green-500" />;
-      case "down":
-        return <TrendingDown className="w-4 h-4 text-red-500" />;
-      default:
-        return <Minus className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const getTrendColor = (trend: "up" | "down" | "neutral") => {
-    switch (trend) {
-      case "up":
-        return "text-green-600 dark:text-green-400";
-      case "down":
-        return "text-red-600 dark:text-red-400";
-      default:
-        return "text-gray-600 dark:text-gray-400";
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -344,9 +314,6 @@ const MatrixPage = ({
                   <th className="text-center py-3 px-4 font-medium text-gray-900 dark:text-white">
                     Success Rate
                   </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-900 dark:text-white">
-                    Trend
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -427,18 +394,6 @@ const MatrixPage = ({
                       <span className="text-gray-900 dark:text-white font-medium">
                         {item.successRate}%
                       </span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <div
-                        className={`flex items-center justify-center space-x-1 ${getTrendColor(
-                          item.trend
-                        )}`}
-                      >
-                        {getTrendIcon(item.trend)}
-                        <span className="text-sm font-medium">
-                          {item.trendPercentage}%
-                        </span>
-                      </div>
                     </td>
                   </tr>
                 ))}
