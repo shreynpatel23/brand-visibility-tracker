@@ -1,15 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import {
-  Filter,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  BarChart3,
-  Target,
-  Activity,
-} from "lucide-react";
+import { Filter, TrendingUp, BarChart3, Target, Activity } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -186,28 +178,6 @@ const MatrixPage = ({
     if (score >= 60) return "text-yellow-700 dark:text-yellow-400";
     if (score >= 40) return "text-orange-700 dark:text-orange-400";
     return "text-red-700 dark:text-red-400";
-  };
-
-  const getTrendIcon = (trend: "up" | "down" | "neutral") => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="w-4 h-4 text-green-500" />;
-      case "down":
-        return <TrendingDown className="w-4 h-4 text-red-500" />;
-      default:
-        return <Minus className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  const getTrendColor = (trend: "up" | "down" | "neutral") => {
-    switch (trend) {
-      case "up":
-        return "text-green-600 dark:text-green-400";
-      case "down":
-        return "text-red-600 dark:text-red-400";
-      default:
-        return "text-gray-600 dark:text-gray-400";
-    }
   };
 
   return (

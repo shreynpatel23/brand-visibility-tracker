@@ -48,7 +48,7 @@ const TriggerAnalysisSchema = z.object({
   stages: z.array(z.enum(["TOFU", "MOFU", "BOFU", "EVFU"])).optional(),
 });
 
-export async function runFullAnalysis({
+async function runFullAnalysis({
   brandId,
   userId,
   analysisId,
