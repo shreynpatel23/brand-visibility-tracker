@@ -344,9 +344,6 @@ const MatrixPage = ({
                   <th className="text-center py-3 px-4 font-medium text-gray-900 dark:text-white">
                     Success Rate
                   </th>
-                  <th className="text-center py-3 px-4 font-medium text-gray-900 dark:text-white">
-                    Trend
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -427,18 +424,6 @@ const MatrixPage = ({
                       <span className="text-gray-900 dark:text-white font-medium">
                         {item.successRate}%
                       </span>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <div
-                        className={`flex items-center justify-center space-x-1 ${getTrendColor(
-                          item.trend
-                        )}`}
-                      >
-                        {getTrendIcon(item.trend)}
-                        <span className="text-sm font-medium">
-                          {item.trendPercentage}%
-                        </span>
-                      </div>
                     </td>
                   </tr>
                 ))}

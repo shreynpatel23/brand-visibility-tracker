@@ -83,9 +83,6 @@ export const { POST } = serve(
       throw new Error("Brand or user not found for background analysis");
     }
 
-    // Step 4: Initialize analysis tracking variables
-    const startedAt = new Date();
-
     // Step 5: Process analysis for each model-stage combination
     // This creates a matrix of analyses (e.g., GPT-4 x Awareness, Claude x Consideration, etc.)
     for (const model of models) {
@@ -155,12 +152,13 @@ export const { POST } = serve(
       // Retrieve all analysis results created during this workflow run
       const analysisResults = await MultiPromptAnalysis.find({
         brand_id: new Types.ObjectId(brandId),
-        createdAt: { $gte: startedAt },
+        createdAt: { $gte: currentAnalysis.started_at },
       });
 
       // Calculate summary statistics for the completion email
       const totalAnalyses = analysisResults.length;
-      const totalAnalysisTime = Date.now() - startedAt.getTime();
+      const totalAnalysisTime =
+        Date.now() - currentAnalysis.started_at.getTime();
 
       // Calculate average overall score across all analyses
       const avgScore =

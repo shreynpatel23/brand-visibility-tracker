@@ -1,6 +1,5 @@
 import { Types } from "mongoose";
 import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
-import { ScoringService, ScoringResult } from "./scoringService";
 import { PromptService } from "./promptService";
 import { AnalysisStage, AIModel } from "@/types/brand";
 
@@ -15,17 +14,17 @@ export interface OrganizedAnalysisData {
   overall_score: number;
   weighted_score: number;
 
-  // Performance Insights
-  performance_level: "excellent" | "good" | "fair" | "poor";
-  primary_insight: string;
-  recommendations: string[];
-
   // Detailed Results
   prompt_results: Array<{
     prompt_id: string;
     prompt_text: string;
     raw_response: string;
-    scoring_result: ScoringResult;
+    scoring_result: {
+      raw_score: number;
+      position_weighted_score: number;
+      mention_position: number | null;
+    };
+    performance_level: "excellent" | "good" | "fair" | "poor";
     processing_time: number;
     status: "success" | "error" | "warning";
   }>;
@@ -90,6 +89,43 @@ export interface DashboardMetrics {
   };
 }
 
+export interface AIAnalysisResults {
+  overallScore: number;
+  weightedScore: number;
+  promptResults: Array<{
+    promptId: string;
+    promptText: string;
+    score: number;
+    weightedScore: number;
+    mentionPosition: number | null;
+    response: string;
+    responseTime: number;
+    sentiment: {
+      overall: "positive" | "neutral" | "negative";
+      confidence: number;
+      distribution: {
+        positive: number;
+        neutral: number;
+        negative: number;
+        strongly_positive: number;
+      };
+    };
+    status: "success" | "error";
+  }>;
+  aggregatedSentiment: {
+    overall: "positive" | "neutral" | "negative";
+    confidence: number;
+    distribution: {
+      positive: number;
+      neutral: number;
+      negative: number;
+      strongly_positive: number;
+    };
+  };
+  totalResponseTime: number;
+  successRate: number;
+}
+
 export class DataOrganizationService {
   /**
    * Process and store comprehensive analysis results
@@ -98,7 +134,7 @@ export class DataOrganizationService {
     brandId: string,
     model: AIModel,
     stage: AnalysisStage,
-    aiAnalysisResults: any,
+    aiAnalysisResults: AIAnalysisResults,
     userId: string,
     triggerType: "manual" | "scheduled" | "webhook" = "manual"
   ): Promise<OrganizedAnalysisData> {
@@ -109,7 +145,7 @@ export class DataOrganizationService {
 
       // Process each prompt result with enhanced scoring
       const processedPromptResults = [];
-      const scoringResults: ScoringResult[] = [];
+      let performanceLevel: "excellent" | "good" | "fair" | "poor";
 
       for (const promptResult of aiAnalysisResults.promptResults) {
         const prompt = promptMap.get(promptResult.promptId);
@@ -118,34 +154,40 @@ export class DataOrganizationService {
           continue;
         }
 
-        const scoringResult: ScoringResult = {
-          raw_score: promptResult.score,
-          position_weighted_score: promptResult.weightedScore,
-          mention_position: promptResult.mentionPosition,
-          stage_specific_classification:
-            promptResult.stage_specific_classification,
-        };
-
-        scoringResults.push({
-          raw_score: promptResult.score,
-          position_weighted_score: promptResult.weightedScore,
-          mention_position: promptResult.mentionPosition,
-          stage_specific_classification:
-            promptResult.stage_specific_classification,
-        });
+        // Determine performance level
+        if (
+          aiAnalysisResults.weightedScore >= 80 &&
+          promptResult.mentionPosition === 1
+        ) {
+          performanceLevel = "excellent";
+        } else if (
+          aiAnalysisResults.weightedScore >= 60 &&
+          promptResult.mentionPosition === 2
+        ) {
+          performanceLevel = "good";
+        } else if (
+          aiAnalysisResults.weightedScore >= 40 &&
+          promptResult.mentionPosition === 3
+        ) {
+          performanceLevel = "fair";
+        } else {
+          performanceLevel = "poor";
+        }
 
         processedPromptResults.push({
           prompt_id: promptResult.promptId,
           prompt_text: promptResult.promptText,
           raw_response: promptResult.response,
-          scoring_result: scoringResult,
+          scoring_result: {
+            raw_score: promptResult.score,
+            position_weighted_score: promptResult.weightedScore,
+            mention_position: promptResult.mentionPosition,
+          },
+          performance_level: performanceLevel,
           processing_time: promptResult.responseTime,
           status: promptResult.status,
         });
       }
-
-      // Generate insights
-      const insights = ScoringService.generateInsights(scoringResults, stage);
 
       // Create organized analysis data
       const organizedData: OrganizedAnalysisData = {
@@ -158,11 +200,6 @@ export class DataOrganizationService {
         // Core Metrics
         overall_score: aiAnalysisResults.overallScore,
         weighted_score: aiAnalysisResults.weightedScore,
-
-        // Performance Insights
-        performance_level: insights.performance_level,
-        primary_insight: insights.primary_insight,
-        recommendations: insights.recommendations,
 
         // Detailed Results
         prompt_results: processedPromptResults,
@@ -212,7 +249,7 @@ export class DataOrganizationService {
         ? 0
         : Math.min(Math.max(data.weighted_score, 0), 100);
       const sanitizedConfidence = isNaN(data.sentiment_analysis.confidence)
-        ? 50
+        ? 0
         : Math.min(Math.max(data.sentiment_analysis.confidence, 0), 100);
       const sanitizedTotalProcessingTime = isNaN(
         data.metadata.total_processing_time
@@ -292,9 +329,14 @@ export class DataOrganizationService {
                 Math.max(result.scoring_result.position_weighted_score, 0),
                 100
               ),
-          mention_position: isNaN(result.scoring_result.mention_position)
-            ? 0
-            : Math.min(Math.max(result.scoring_result.mention_position, 0), 5),
+          mention_position: result?.scoring_result?.mention_position
+            ? isNaN(result?.scoring_result?.mention_position)
+              ? 0
+              : Math.min(
+                  Math.max(result?.scoring_result?.mention_position, 0),
+                  5
+                )
+            : 0,
           response: result.raw_response || "No response",
           response_time: isNaN(result.processing_time)
             ? 0
@@ -313,7 +355,9 @@ export class DataOrganizationService {
           total_prompts: Math.max(data.metadata.total_prompts, 0),
           successful_prompts: Math.max(data.metadata.successful_prompts, 0),
         },
-        status: data.performance_level === "poor" ? "warning" : "success",
+        status: data.prompt_results.some((result) => result.status === "error")
+          ? "error"
+          : "success",
       });
 
       await multiPromptAnalysis.save();

@@ -1,5 +1,7 @@
-import { AIModel, AnalysisStage } from "@/types/brand";
-import { PromptService } from "./promptService";
+import { AIModel, AnalysisStage, IBrand } from "@/types/brand";
+import { LLMService } from "./llmService";
+import { PromptService, StageSpecificWeights } from "./promptService";
+import { AIAnalysisResults } from "./dataOrganizationService";
 
 export class AIService {
   // AI API configuration
@@ -15,402 +17,416 @@ export class AIService {
     Gemini: process.env.GEMINI_API_URL!,
   };
 
-  // Stage-specific classification scoring system
-  private static readonly STAGE_CLASSIFICATIONS = {
-    TOFU: {
-      mentioned: {
-        1: 100,
-        2: 75,
-        3: 50,
-        4: 25,
-        5: 10,
-      },
-      not_mentioned: 0,
-    },
-    MOFU: {
-      mofu_positive: 100,
-      mofu_conditional: 75,
-      mofu_neutral: 50,
-      mofu_negative: 25,
-      mofu_absent: 0,
-    },
-    BOFU: {
-      bofu_yes: 100,
-      bofu_partial: 75,
-      bofu_unclear: 50,
-      bofu_no: 25,
-      bofu_absent: 0,
-    },
-    EVFU: {
-      evfu_recommend: 100,
-      evfu_caveat: 75,
-      evfu_neutral: 50,
-      evfu_negative: 25,
-      evfu_absent: 0,
-    },
-  } as const;
+  private static computeStageSpecificScore(
+    stage: "TOFU" | "MOFU" | "BOFU" | "EVFU",
+    value: string,
+    weights: any,
+    baseWeight: number
+  ): { rawScore: number; weightedScore: number } {
+    let stageMap: Record<string, number> = {};
 
-  /**
-   * Calculate score based on stage and classification
-   */
-  private static calculateScore(
-    stage: string,
-    classification: string,
-    mentionPosition?: number
-  ): number {
-    const stageKey = stage as keyof typeof this.STAGE_CLASSIFICATIONS;
-
-    if (!this.STAGE_CLASSIFICATIONS[stageKey]) {
-      return 0;
-    }
-
-    // Special handling for TOFU stage - position-based scoring
-    if (stage === "TOFU") {
-      const tofuClassifications = this.STAGE_CLASSIFICATIONS.TOFU;
-      if (
-        classification === "mentioned" &&
-        mentionPosition &&
-        mentionPosition >= 1 &&
-        mentionPosition <= 5
-      ) {
-        return tofuClassifications.mentioned[
-          mentionPosition as keyof typeof tofuClassifications.mentioned
-        ];
-      }
-      if (classification === "not_mentioned") {
-        return tofuClassifications.not_mentioned;
-      }
-      return 0;
-    }
-
-    // For other stages, use direct classification mapping
-    const stageClassifications = this.STAGE_CLASSIFICATIONS[stageKey];
-    const classificationKey =
-      classification as keyof typeof stageClassifications;
-    return (stageClassifications as any)[classificationKey] || 0;
-  }
-
-  /**
-   * Get stage-specific analysis instructions
-   */
-  private static getStageSpecificInstructions(stage: string): string {
     switch (stage) {
       case "TOFU":
-        return `Focus on *brand awareness*, *visibility*, and *recognition*. Determine the brand's position when mentioned in lists or discussions. Position matters significantly for scoring.`;
+        stageMap = weights.position_weights;
+        break;
       case "MOFU":
-        return `Focus on *brand consideration* and *evaluation versus competitors*. Assess how the brand is perceived in comparison contexts and shortlist discussions.`;
+        stageMap = weights.mofu_scale;
+        break;
       case "BOFU":
-        return `Focus on *purchase intent* and *decision factors*. Determine if the brand is chosen, recommended, or rejected based on trust, pricing, or quality factors.`;
+        stageMap = weights.bofu_scale;
+        break;
       case "EVFU":
-        return `Focus on *post-purchase experience*, *loyalty*, and *advocacy potential*. Assess satisfaction levels, repeat usage indicators, and recommendation likelihood.`;
-      default:
-        return `Analyze general brand perception and positioning in the response.`;
+        stageMap = weights.evfu_scale;
+        break;
     }
+
+    const rawScore = stageMap[value] ?? 0;
+    const weightedScore = rawScore * baseWeight;
+    return { rawScore, weightedScore };
   }
 
   /**
-   * Get classification guidelines for each stage
+   * Get the system prompt for the given stage
+   * @param response - The response from the AI model
+   * @param stage - The stage of the marketing funnel to analyze
+   * @param brandData - The brand data to use in the prompt
+   * @returns The system prompt for the given stage
    */
-  private static getClassificationGuidelines(stage: string): string {
+  private static getStageSpeficAnalysisPrompt(
+    prompt: string,
+    response: string,
+    stage: AnalysisStage,
+    brandData: IBrand
+  ): {
+    systemMessage: string;
+    prompt: string;
+  } {
+    const {
+      name,
+      category,
+      region,
+      target_audience,
+      use_case,
+      competitors,
+      feature_list,
+    } = brandData;
+
+    // // Common dynamic info block
+    const brandSummary = `
+        Brand Context:
+        - Brand Name: ${name || "Unknown Brand"}
+        - Category: ${category || "General Business Services"}
+        - Region: ${region || "Global"}
+        - Target Audience: ${
+          (target_audience && target_audience.join(", ")) || "Businesses"
+        }
+        - Use Case: ${use_case || "General Needs"}
+        - Competitors: ${
+          (competitors && competitors.join(", ")) || "None specified"
+        }
+        - Key Features: ${
+          (feature_list && feature_list.slice(0, 3).join(", ")) ||
+          "Core Offerings"
+        }`;
+
     switch (stage) {
       case "TOFU":
-        return `
-    ### Classification Guidelines - TOFU (Brand Awareness)
-    - "mentioned" → brand is mentioned in the response (position determines score: 1st=100, 2nd=75, 3rd=50, 4th=25, 5th=10)
-    - "not_mentioned" → brand is not mentioned at all (score=0)`;
+        return {
+          systemMessage: `
+          You are a marketing analysis assistant.
+          Your task is to evaluate a brand’s presence and visibility in the Top-Of-Funnel (TOFU) stage.
+
+          TOFU focuses on awareness and recognition:
+          - How visible is the brand online and within its industry?
+          - Is the brand mentioned among top competitors or notable players?
+          - How discoverable is it in search and social contexts?
+        `,
+          prompt: `
+          Brand Context:
+          ${brandSummary}
+
+          Question asked:
+          ${prompt}
+
+          Response to Evaluate:
+          ${response}
+
+          When evaluating:
+          - Identify if the brand is mentioned among industry leaders.
+          - Assign a rank: first, second, third, fourth, fifth, or 'absent'.
+          - Be concise and objective.
+
+          Format strictly like this, Make sure all keys and strings are properly quoted and commas are placed correctly.
+          Example:
+          { 
+            "brand_mentioned": true/false,
+            "rank": "first|second|third|fourth|fifth|absent",
+            "comment": "<short comment based on the question asked and the response to evaluate, if the brand is mentioned, provide a short comment on why it is mentioned in the given rank, if the brand is not mentioned, provide a short comment on why it is not mentioned and how it can be improved to be mentioned in the given rank>",
+            "sentiment_distribution": {
+              "overall": "positive|neutral|negative",
+              "confidence": number <0-100>,
+              "distribution": {
+                "positive": number <0-100>,
+                "neutral": number <0-100>,
+                "negative": number <0-100>,
+                "strongly_positive": number <0-100>,
+              }
+            }
+          }`.trim(),
+        };
       case "MOFU":
-        return `
-    ### Classification Guidelines - MOFU (Consideration)
-    - "mofu_positive" → strong brand consideration, compared favorably vs competitors (score=100)
-    - "mofu_conditional" → considered under some conditions or with caveats (score=75)
-    - "mofu_neutral" → neutral perception, mentioned without strong preference (score=50)
-    - "mofu_negative" → unfavorable perception or weak consideration (score=25)
-    - "mofu_absent" → not mentioned in consideration context (score=0)`;
+        return {
+          systemMessage: `
+          You are a marketing analysis assistant.
+          Your task is to evaluate a brand’s performance in the Middle-Of-Funnel (MOFU) stage.
+
+          MOFU focuses on evaluation and consideration:
+          - How do people perceive the brand’s value, features, and credibility?
+          - What is the sentiment around its offerings compared to competitors?
+          `,
+          prompt: `
+          Brand Context:
+          ${brandSummary}
+
+          Question asked:
+          ${prompt}
+
+          Response to Evaluate:
+          ${response}
+
+
+          When evaluating:
+          - Assign tone: positive, conditional, neutral, negative, or absent.
+          - Provide short reasoning if relevant.
+
+          Format strictly like this, Make sure all keys and strings are properly quoted and commas are placed correctly.
+          Example:
+          {
+            "tone": "positive|conditional|neutral|negative|absent",
+            "comment": "<short comment based on the question asked and the response to evaluate, if positive, provide a short comment on why it is positive, if conditional / neutral / negative/ absent, provide a short comment on why it is conditional / neutral / negative / absent and how it can be improved to be positive>",
+            "sentiment_distribution": {
+              "overall": "positive|neutral|negative",
+              "confidence": number <0-100>,
+              "distribution": {
+                "positive": number <0-100>,
+                "neutral": number <0-100>,
+                "negative": number <0-100>,
+                "strongly_positive": number <0-100>,
+              }
+            }
+          }`.trim(),
+        };
       case "BOFU":
-        return `
-    ### Classification Guidelines - BOFU (Purchase Intent)
-    - "bofu_yes" → clear purchase intent or strong preference indicated (score=100)
-    - "bofu_partial" → some indicators of interest or partial preference (score=75)
-    - "bofu_unclear" → uncertain or ambiguous purchase signals (score=50)
-    - "bofu_no" → unlikely to purchase or rejected (score=25)
-    - "bofu_absent" → not mentioned in purchase context (score=0)`;
+        return {
+          systemMessage: `
+          You are a marketing analysis assistant.
+          Your task is to evaluate a brand’s performance in the Bottom-Of-Funnel (BOFU) stage.
+
+          BOFU focuses on purchase intent and reliability:
+          - How likely is a customer to convert or buy?
+          - Is the brand positioned clearly for conversion?
+          `,
+          prompt: `
+          Brand Context:
+          ${brandSummary}
+
+          Question asked:
+          ${prompt}
+
+          Response to Evaluate:
+          ${response}
+
+          When evaluating:
+          - Assign intent: yes, partial, unclear, no, or absent.
+          - Provide short reasoning if relevant.
+
+          Format strictly like this, Make sure all keys and strings are properly quoted and commas are placed correctly.
+          Example:
+          {
+            "intent": "yes|partial|unclear|no|absent",
+            "comment": "<short comment based on the question asked and the response to evaluate, if yes, provide a short comment on why it is yes, if partial / unclear / no / absent, provide a short comment on why it is partial / unclear / no / absent and how it can be improved to be yes>",
+            "sentiment_distribution": {
+              "overall": "positive|neutral|negative",
+              "confidence": number <0-100>,
+              "distribution": {
+                "positive": number <0-100>,
+                "neutral": number <0-100>,
+                "negative": number <0-100>,
+                "strongly_positive": number <0-100>,
+              }
+            }
+          }`.trim(),
+        };
       case "EVFU":
-        return `
-    ### Classification Guidelines - EVFU (Post-Purchase/Advocacy)
-    - "evfu_recommend" → strong advocacy, positive experience, clear recommendation (score=100)
-    - "evfu_caveat" → recommends with caveats or mentions minor issues (score=75)
-    - "evfu_neutral" → mixed or indifferent post-purchase sentiment (score=50)
-    - "evfu_negative" → poor experience or dissatisfaction expressed (score=25)
-    - "evfu_absent" → not mentioned in post-purchase context (score=0)`;
+        return {
+          systemMessage: `
+          You are a marketing analysis assistant.
+          Your task is to evaluate a brand’s performance in the End-Of-Funnel (EVFU) stage.
+
+          EVFU focuses on post-purchase reputation, trust, and loyalty:
+          - How do customers perceive their experience with the brand?
+          - Would they recommend it to others?`,
+          prompt: `
+          Brand Context:
+          ${brandSummary}
+
+          Question asked:
+          ${prompt}
+
+          Response to Evaluate:
+          ${response}
+
+          When evaluating:
+          - Assign sentiment: recommend, caveat, neutral, negative, or absent.
+          - Provide short reasoning if relevant.
+
+          Format strictly like this, Make sure all keys and strings are properly quoted and commas are placed correctly.
+          Example:
+          {
+            "sentiment": "recommend|caveat|neutral|negative|absent",
+            "comment": "<short comment based on the question asked and the response to evaluate, if recommend, provide a short comment on why it is recommend, if caveat / neutral / negative / absent, provide a short comment on why it is caveat / neutral / negative / absent and how it can be improved to be recommend>",
+            "sentiment_distribution": {
+              "overall": "positive|neutral|negative",
+              "confidence": number <0-100>,
+              "distribution": {
+                "positive": number <0-100>,
+                "neutral": number <0-100>,
+                "negative": number <0-100>,
+                "strongly_positive": number <0-100>,
+              }
+            }
+          }`.trim(),
+        };
+
       default:
-        return `
-    ### Classification Guidelines - General
-    - Classify based on overall brand perception in the response`;
+        throw new Error(`Unknown analysis stage: ${stage}`);
     }
   }
-
-  /**
-   * Create a structured prompt that ensures AI provides all required metrics
-   */
-  private static readonly systemMessage =
-    "You are a helpful assistant tasked with answering business discovery questions using general market knowledge and inference.\nWhen possible, respond in the form of a ranked list of exactly 5 options.\nRank them in order of relevance, prominence, or likelihood.\nIf you are unfamiliar with any specific brands, provide comparable examples or general best practices.\nAvoid discussing your training data or knowledge cutoff unless specifically asked.\nDo not explain the ranking unless explicitly instructed.\nAvoid using hedge words like 'likely', 'probably', 'seems', 'appears' - be direct and confident in your assessments.";
 
   /**
    * Parse AI response to extract structured data with proper stage-specific scoring
    */
   private static async parseAIResponse(
+    prompt: string,
     data: string,
-    brandName: string,
-    stage?: string
-  ): Promise<any> {
-    const stageInstructions = this.getStageSpecificInstructions(
-      stage || "Unknown"
+    brandData: IBrand,
+    stage?: string,
+    weights?: StageSpecificWeights
+  ): Promise<{
+    score: number;
+    position_weighted_score: number;
+    mentionPosition: number | null;
+    analysis: string;
+    sentiment: {
+      overall: "positive" | "neutral" | "negative";
+      confidence: number;
+      distribution: {
+        positive: number;
+        neutral: number;
+        negative: number;
+        strongly_positive: number;
+      };
+    };
+    status: "success" | "error";
+  }> {
+    const aiResponse = await LLMService.callChatGPT(
+      this.getStageSpeficAnalysisPrompt(
+        prompt,
+        data,
+        stage as AnalysisStage,
+        brandData
+      ).prompt,
+      this.getStageSpeficAnalysisPrompt(
+        prompt,
+        data,
+        stage as AnalysisStage,
+        brandData
+      ).systemMessage
+    );
+    let response;
+    try {
+      response = JSON.parse(aiResponse.response);
+    } catch (error) {
+      console.error("JSON parsing error:", error);
+      console.error("Raw AI response:", aiResponse.response);
+      response = {
+        score: 0,
+        position_weighted_score: 0,
+        mentionPosition: null,
+        analysis: `JSON parsing failed. Raw response: ${aiResponse.response}`,
+        sentiment: {
+          overall: "neutral",
+          confidence: 0,
+          distribution: {
+            positive: 0,
+            neutral: 0,
+            negative: 0,
+            strongly_positive: 0,
+          },
+        },
+        status: "error",
+      };
+    }
+
+    if (response.status === "error") {
+      return response;
+    }
+
+    let value = "";
+    let mentionedPosition = null;
+    switch (stage) {
+      case "TOFU":
+        value = response.rank;
+        mentionedPosition =
+          response.rank === "first"
+            ? 1
+            : response.rank === "second"
+            ? 2
+            : response.rank === "third"
+            ? 3
+            : response.rank === "fourth"
+            ? 4
+            : response.rank === "fifth"
+            ? 5
+            : 0;
+        break;
+      case "MOFU":
+        value = response.tone;
+        mentionedPosition =
+          response.tone === "positive"
+            ? 1
+            : response.tone === "conditional"
+            ? 2
+            : response.tone === "neutral"
+            ? 3
+            : response.tone === "negative"
+            ? 4
+            : 0;
+        break;
+      case "BOFU":
+        value = response.intent;
+        mentionedPosition =
+          response.intent === "yes"
+            ? 1
+            : response.intent === "partial"
+            ? 2
+            : response.intent === "unclear"
+            ? 3
+            : response.intent === "no"
+            ? 4
+            : 0;
+        break;
+      case "EVFU":
+        value = response.sentiment;
+        mentionedPosition =
+          response.sentiment === "recommend"
+            ? 1
+            : response.sentiment === "caveat"
+            ? 2
+            : response.sentiment === "neutral"
+            ? 3
+            : response.sentiment === "negative"
+            ? 4
+            : 0;
+        break;
+      default:
+        throw new Error(`Unknown stage: ${stage}`);
+    }
+
+    const { rawScore, weightedScore } = this.computeStageSpecificScore(
+      stage as AnalysisStage,
+      value,
+      weights,
+      weights?.base_weight || 1
     );
 
-    const analysisPrompt = `
-    You are an expert marketing analyst trained to evaluate brand performance across different stages of the marketing funnel.
-    
-    Your task is to analyze the following AI-generated response and assess how the brand "${brandName}" is mentioned, perceived, and positioned.
-    
-    ### Context
-    Analysis Stage: ${stage || "Unknown"}
-    ${stageInstructions}
-    
-    ### Response to Analyze
-    "${data}"
-    
-    ### Output Format
-    Return a **strict JSON** object:
-    {
-      "sentiment": {
-        "distribution": {
-          "positive": number,
-          "neutral": number,
-          "negative": number,
-          "strongly_positive": number
-        },
-        "overall": "positive" | "neutral" | "negative",
-        "confidence": number  // 0–100
-      },
-      "mentionPosition": number,  // Position of brand mention (1–5), or 0 if absent
-      "stage_specific_classification": string,  // Use the appropriate label from guidelines below
-      "analysis": string  // Detailed analysis including performance summary and recommendations
-    }
-    
-    ${this.getClassificationGuidelines(stage || "Unknown")}
-    
-    ### Rules
-    - If the brand is **not mentioned**, set mentionPosition = 0 and use appropriate "absent/not_mentioned" classification
-    - Always include reasoning in **analysis** describing why the classification and sentiment were chosen
-    - Avoid adding any explanatory text outside the JSON
-    `;
-
-    try {
-      const response = await fetch(this.AI_ENDPOINTS.ChatGPT, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.API_KEYS.ChatGPT}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [{ role: "user", content: analysisPrompt }],
-          max_tokens: 1000,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `ChatGPT API error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const res = await response.json();
-      const parsedData = JSON.parse(res.choices[0].message.content);
-
-      // Calculate score based on stage and classification
-      const calculatedScore = this.calculateScore(
-        stage || "Unknown",
-        parsedData.stage_specific_classification || "not_mentioned",
-        parsedData.mentionPosition
-      );
-
-      return {
-        score: calculatedScore,
-        position_weighted_score: calculatedScore,
-        sentiment: {
-          distribution: {
-            positive: parsedData.sentiment?.distribution?.positive || 0,
-            neutral: parsedData.sentiment?.distribution?.neutral || 0,
-            negative: parsedData.sentiment?.distribution?.negative || 0,
-            strongly_positive:
-              parsedData.sentiment?.distribution?.strongly_positive || 0,
-          },
-          overall: parsedData.sentiment?.overall || "neutral",
-          confidence: parsedData.sentiment?.confidence || 0,
-        },
-        mentionPosition: parsedData.mentionPosition || 0,
-        stage_specific_classification:
-          parsedData.stage_specific_classification || "not_mentioned",
-        analysis:
-          `AI Response: ${data}\n\nAnalysis: ${parsedData.analysis}` ||
-          "No analysis provided",
-      };
-    } catch (error) {
-      throw new Error(
-        `ChatGPT API error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
+    return {
+      score: rawScore,
+      position_weighted_score: weightedScore,
+      mentionPosition: mentionedPosition,
+      analysis: response.comment,
+      sentiment: response.sentiment_distribution,
+      status: "success",
+    };
   }
 
   /**
-   * Call ChatGPT API
+   * Create a structured prompt that ensures AI provides all required metrics
    */
-  private static async callChatGPT(prompt: string): Promise<{
-    response: string;
-    responseTime: number;
-  }> {
-    const startTime = Date.now();
+  private static readonly systemMessage = `You are a helpful assistant tasked with answering business discovery questions using general market knowledge and logical inference.
 
-    if (!this.API_KEYS.ChatGPT) {
-      throw new Error("ChatGPT API key not configured");
-    }
+    Adjust your response style based on the type of question:
+    - **TOFU (Top of Funnel):** Provide a ranked list of exactly 5 options. Rank them in order of relevance, prominence, or likelihood. Avoid explanations unless explicitly asked.
+    - **MOFU (Middle of Funnel):** Provide an evaluative, sentiment-based comparison or assessment of the mentioned brand(s). Focus on highlighting strengths, weaknesses, differentiators, and overall perception.
+    - **BOFU (Bottom of Funnel):** Respond with sentiment and confidence about reliability, credibility, and buyer-readiness of the mentioned brand(s).
+    - **EVFU (End of Funnel):** Respond sentimentally and persuasively, focusing on trust, reputation, and recommendation likelihood.
 
-    try {
-      const response = await fetch(this.AI_ENDPOINTS.ChatGPT, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.API_KEYS.ChatGPT}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: this.systemMessage },
-            { role: "user", content: prompt },
-          ],
-          max_tokens: 1000,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `ChatGPT API error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      return {
-        response: data.choices[0].message.content,
-        responseTime: Date.now() - startTime,
-      };
-    } catch (error) {
-      throw new Error(
-        `ChatGPT API error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  }
-
-  /**
-   * Call Claude API
-   */
-  private static async callClaude(prompt: string): Promise<{
-    response: string;
-    responseTime: number;
-  }> {
-    const startTime = Date.now();
-
-    if (!this.API_KEYS.Claude) {
-      throw new Error("Claude API key not configured");
-    }
-
-    try {
-      const response = await fetch(this.AI_ENDPOINTS.Claude, {
-        method: "POST",
-        headers: {
-          "x-api-key": this.API_KEYS.Claude,
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-sonnet-20240620",
-          max_tokens: 1000,
-          system: this.systemMessage,
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Claude API error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      return {
-        response: data.content[0].text,
-        responseTime: Date.now() - startTime,
-      };
-    } catch (error) {
-      throw new Error(
-        `Claude API error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  }
-
-  /**
-   * Call Gemini API
-   */
-  private static async callGemini(prompt: string): Promise<{
-    response: string;
-    responseTime: number;
-  }> {
-    const startTime = Date.now();
-
-    if (!this.API_KEYS.Gemini) {
-      throw new Error("Gemini API key not configured");
-    }
-
-    const geminiPrompt = `${this.systemMessage}
-    ${prompt}`;
-
-    try {
-      const response = await fetch(this.AI_ENDPOINTS.Gemini, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": this.API_KEYS.Gemini,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: geminiPrompt }] }],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `Gemini API error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      return {
-        response: data.candidates[0].content.parts[0].text,
-        responseTime: Date.now() - startTime,
-      };
-    } catch (error) {
-      throw new Error(
-        `Gemini API error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    }
-  }
+    General Rules:
+    - Be direct and confident — avoid hedge words like “likely,” “probably,” or “appears.”
+    - If you are unfamiliar with specific brands, infer based on general industry norms or provide comparable examples.
+    - Do not discuss your training data, knowledge cutoff, or reasoning process.
+    - Never include system or meta information in your output.
+    - Do Not include the stage name in your response. (like MOFU Response, TOFU Response, etc.)`;
 
   /**
    * Analyze brand with a single AI model and prompt
@@ -418,8 +434,9 @@ export class AIService {
   public static async analyzeBrand(
     model: AIModel,
     prompt: string,
-    brandName: string,
-    stage?: string
+    brandData: IBrand,
+    stage?: string,
+    weights?: StageSpecificWeights
   ): Promise<{
     score: number;
     position_weighted_score: number;
@@ -435,24 +452,22 @@ export class AIService {
         strongly_positive: number;
       };
     };
-    mentionPosition: number;
-    stage_specific_classification: string;
+    mentionPosition: number | null;
     analysis: string;
     status: "success" | "error";
   }> {
     try {
       let aiResponse: { response: string; responseTime: number };
-
       // Call the appropriate AI model
       switch (model) {
         case "ChatGPT":
-          aiResponse = await this.callChatGPT(prompt);
+          aiResponse = await LLMService.callChatGPT(prompt, this.systemMessage);
           break;
         case "Claude":
-          aiResponse = await this.callClaude(prompt);
+          aiResponse = await LLMService.callClaude(prompt, this.systemMessage);
           break;
         case "Gemini":
-          aiResponse = await this.callGemini(prompt);
+          aiResponse = await LLMService.callGemini(prompt, this.systemMessage);
           break;
         default:
           throw new Error(`Unsupported AI model: ${model}`);
@@ -460,9 +475,11 @@ export class AIService {
 
       // Parse the structured response with AI-generated weighted scores
       const parsedData = await this.parseAIResponse(
+        prompt,
         aiResponse.response,
-        brandName,
-        stage
+        brandData,
+        stage,
+        weights
       );
 
       return {
@@ -472,7 +489,6 @@ export class AIService {
         responseTime: aiResponse.responseTime,
         sentiment: parsedData.sentiment,
         mentionPosition: parsedData.mentionPosition,
-        stage_specific_classification: parsedData.stage_specific_classification,
         analysis: parsedData.analysis,
         status: "success",
       };
@@ -496,7 +512,6 @@ export class AIService {
           },
         },
         mentionPosition: 0,
-        stage_specific_classification: "not_mentioned",
         analysis: "Analysis failed due to API error",
         status: "error",
       };
@@ -510,42 +525,7 @@ export class AIService {
     brandData: any,
     model: AIModel,
     stage: AnalysisStage
-  ): Promise<{
-    overallScore: number;
-    weightedScore: number;
-    promptResults: Array<{
-      promptId: string;
-      promptText: string;
-      score: number;
-      weightedScore: number;
-      mentionPosition: number;
-      response: string;
-      responseTime: number;
-      sentiment: {
-        overall: "positive" | "neutral" | "negative";
-        confidence: number;
-        distribution: {
-          positive: number;
-          neutral: number;
-          negative: number;
-          strongly_positive: number;
-        };
-      };
-      status: "success" | "error";
-    }>;
-    aggregatedSentiment: {
-      overall: "positive" | "neutral" | "negative";
-      confidence: number;
-      distribution: {
-        positive: number;
-        neutral: number;
-        negative: number;
-        strongly_positive: number;
-      };
-    };
-    totalResponseTime: number;
-    successRate: number;
-  }> {
+  ): Promise<AIAnalysisResults> {
     try {
       // Get prompts for the specific stage
       const stagePrompts = await PromptService.getPromptsByStage(stage);
@@ -580,27 +560,26 @@ export class AIService {
           const analysisResult = await this.analyzeBrand(
             model,
             processedPromptText,
-            brandData.name,
-            stage
+            brandData,
+            stage,
+            prompt.weights
           );
 
           promptResults.push({
             promptId: prompt.prompt_id,
             promptText: processedPromptText,
-            score: analysisResult.score,
-            weightedScore: analysisResult.position_weighted_score,
+            score: analysisResult.score * 100,
+            weightedScore: analysisResult.position_weighted_score * 100,
             mentionPosition: analysisResult.mentionPosition,
-            response: analysisResult.analysis,
+            response: `Response: \n\n ${analysisResult.response} \n\n Recommendation: ${analysisResult.analysis}`,
             responseTime: analysisResult.responseTime,
             sentiment: analysisResult.sentiment,
             status: analysisResult.status,
-            stage_specific_classification:
-              analysisResult.stage_specific_classification,
           });
 
           if (analysisResult.status === "success") {
             successfulPrompts++;
-            totalWeightedScore += analysisResult.position_weighted_score;
+            totalWeightedScore += analysisResult.position_weighted_score * 100;
             totalWeightSum += 1;
 
             // Aggregate sentiment data

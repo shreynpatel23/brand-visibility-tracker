@@ -75,8 +75,6 @@ export async function runFullAnalysis({
   const user = await User.findById(userId);
   if (!brand || !user) throw new Error("Brand or user not found");
 
-  const startedAt = new Date();
-
   // 4. Process each model-stage combo
   for (const model of models) {
     for (const stage of stages) {
@@ -127,7 +125,7 @@ export async function runFullAnalysis({
   // 5. Finalize and send email
   const results = await MultiPromptAnalysis.find({
     brand_id: new Types.ObjectId(brandId),
-    createdAt: { $gte: startedAt },
+    createdAt: { $gte: currentAnalysis.started_at },
   });
 
   const totalAnalyses = results.length;
@@ -156,7 +154,7 @@ export async function runFullAnalysis({
       totalAnalyses,
       averageScore: Math.round(avgScore * 100) / 100,
       averageWeightedScore: Math.round(avgWeightedScore * 100) / 100,
-      completionTime: Date.now() - startedAt.getTime(),
+      completionTime: Date.now() - currentAnalysis.started_at.getTime(),
     }
   );
 
@@ -638,7 +636,7 @@ export const POST = async (
     }
 
     if (process.env.NODE_ENV === "development") {
-      await runFullAnalysis({
+      runFullAnalysis({
         brandId,
         userId,
         analysisId,
