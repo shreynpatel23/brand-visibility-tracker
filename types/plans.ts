@@ -2,15 +2,6 @@
 
 import { Types } from "mongoose";
 
-// Plan types constants
-export const PlanTypes = {
-  STARTER: "starter",
-  PROFESSIONAL: "professional",
-  ENTERPRISE: "enterprise",
-} as const;
-
-export type PlanType = (typeof PlanTypes)[keyof typeof PlanTypes];
-
 // Database Plan model interface
 export interface IPlan {
   _id: string;

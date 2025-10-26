@@ -83,7 +83,7 @@ export const GET = async (
     );
   } catch (error) {
     return new NextResponse(
-      JSON.stringify({ message: "Error in fetching user role!" }),
+      JSON.stringify({ message: "Error in fetching user role!", error: error }),
       { status: 500 }
     );
   }
