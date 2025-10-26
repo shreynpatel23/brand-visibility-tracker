@@ -1,106 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Coins, Plus, TrendingUp, TrendingDown } from "lucide-react";
-import { toast } from "sonner";
-import Loading from "../loading";
 import { useRouter } from "next/navigation";
-import { fetchData } from "@/utils/fetch";
+import formatCredits from "@/utils/formatCredits";
 
 interface CreditStats {
   currentBalance: number;
   totalPurchased: number;
   totalUsed: number;
-  recentTransactions: Array<{
-    _id: string;
-    type: "purchase" | "usage" | "refund" | "bonus";
-    amount: number;
-    description: string;
-    createdAt: string;
-  }>;
 }
 
 interface CreditBalanceProps {
-  userId: string;
-  onPurchaseClick?: () => void;
+  creditData: CreditStats;
   showPurchaseButton?: boolean;
   compact?: boolean;
   purchaseUrl?: string;
 }
 
 export function CreditBalance({
-  userId,
-  onPurchaseClick,
+  creditData,
   showPurchaseButton = true,
   compact = false,
   purchaseUrl,
 }: CreditBalanceProps) {
-  const [creditStats, setCreditStats] = useState<CreditStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const fetchCreditBalance = async () => {
-    try {
-      setLoading(true);
-      const response = await fetchData(`/api/credits/balance?userId=${userId}`);
-      const { data } = response;
-      setCreditStats(data);
-      setError(null);
-    } catch (err) {
-      console.log("Error fetching credit balance:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to load credit balance"
-      );
-      toast.error("Failed to load credit balance");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (userId) {
-      fetchCreditBalance();
-    }
-  }, [userId]);
 
   const handlePurchaseClick = () => {
-    if (onPurchaseClick) {
-      onPurchaseClick();
-    } else {
-      router.push(purchaseUrl || "/credits/purchase");
+    if (purchaseUrl) {
+      router.push(purchaseUrl);
     }
   };
 
-  if (loading) {
-    return <Loading message="Loading credit balance..." />;
-  }
-
-  if (error || !creditStats) {
-    return (
-      <div
-        className={`flex items-center justify-between ${
-          compact ? "p-2" : "p-4"
-        } border rounded-lg border-red-200 bg-red-50`}
-      >
-        <div className="flex items-center gap-3">
-          <Coins className="h-5 w-5 text-red-500" />
-          <span className="text-sm text-red-600">Failed to load credits</span>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={fetchCreditBalance}
-          className="text-red-600 border-red-300 hover:bg-red-100"
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  const { currentBalance, totalPurchased, totalUsed } = creditStats;
+  const { currentBalance, totalPurchased, totalUsed } = creditData;
   const isLowBalance = currentBalance < 10;
   const balanceColor = isLowBalance
     ? "text-red-600"
@@ -115,7 +48,7 @@ export function CreditBalance({
           <Coins className="h-4 w-4 text-gray-500" />
           <p className="text-sm text-gray-500">Available Credits:</p>
           <span className={`font-semibold ${balanceColor}`}>
-            {currentBalance}
+            {formatCredits(currentBalance)}
           </span>
         </div>
         {showPurchaseButton && isLowBalance && (
@@ -155,7 +88,7 @@ export function CreditBalance({
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center">
           <div className={`text-2xl font-bold ${balanceColor}`}>
-            {currentBalance}
+            {formatCredits(currentBalance)}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-200">
             Available
@@ -168,9 +101,9 @@ export function CreditBalance({
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-1">
+          <div className="text-lg font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2">
             <TrendingUp className="h-4 w-4 text-green-500" />
-            {totalPurchased}
+            {formatCredits(totalPurchased)}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-200">
             Purchased
@@ -178,9 +111,9 @@ export function CreditBalance({
         </div>
 
         <div className="text-center">
-          <div className="text-lg font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-1">
+          <div className="text-lg font-semibold text-gray-700 dark:text-gray-200 flex items-center justify-center gap-2">
             <TrendingDown className="h-4 w-4 text-orange-500" />
-            {totalUsed}
+            {formatCredits(totalUsed)}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-200">Used</div>
         </div>

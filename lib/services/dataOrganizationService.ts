@@ -2,133 +2,50 @@ import { Types } from "mongoose";
 import MultiPromptAnalysis from "@/lib/models/multiPromptAnalysis";
 import { PromptService } from "./promptService";
 import { AnalysisStage, AIModel } from "@/types/brand";
+import {
+  OrganizedAnalysisData,
+  DashboardMetrics,
+  AIAnalysisResults,
+  PerformanceLevel,
+  TriggerType,
+  ProcessedPromptResult,
+  DashboardFilters,
+  DateRange,
+} from "@/types/services";
 
-export interface OrganizedAnalysisData {
-  analysis_id: string;
-  brand_id: string;
-  model: AIModel;
-  stage: AnalysisStage;
-  timestamp: Date;
-
-  // Core Metrics
-  overall_score: number;
-  weighted_score: number;
-
-  // Detailed Results
-  prompt_results: Array<{
-    prompt_id: string;
-    prompt_text: string;
-    raw_response: string;
-    scoring_result: {
-      raw_score: number;
-      position_weighted_score: number;
-      mention_position: number | null;
-    };
-    performance_level: "excellent" | "good" | "fair" | "poor";
-    processing_time: number;
-    status: "success" | "error" | "warning";
-  }>;
-
-  // Aggregated Sentiment
-  sentiment_analysis: {
-    overall: "positive" | "neutral" | "negative";
-    confidence: number;
-    distribution: {
-      positive: number;
-      neutral: number;
-      negative: number;
-      strongly_positive: number;
-    };
-  };
-
-  // Metadata
-  metadata: {
-    user_id: string;
-    trigger_type: "manual" | "scheduled" | "webhook";
-    version: string;
-    total_prompts: number;
-    successful_prompts: number;
-    total_processing_time: number;
-  };
-}
-
-export interface DashboardMetrics {
-  brand_summary: {
-    brand_id: string;
-    brand_name: string;
-    last_updated: Date;
-    total_analyses: number;
-  };
-
-  funnel_performance: {
-    TOFU: { score: number; trend: "up" | "down" | "neutral"; change: number };
-    MOFU: { score: number; trend: "up" | "down" | "neutral"; change: number };
-    BOFU: { score: number; trend: "up" | "down" | "neutral"; change: number };
-    EVFU: { score: number; trend: "up" | "down" | "neutral"; change: number };
-  };
-
-  model_performance: {
-    ChatGPT: { score: number; analyses: number; reliability: number };
-    Claude: { score: number; analyses: number; reliability: number };
-    Gemini: { score: number; analyses: number; reliability: number };
-  };
-
-  time_series_data: Array<{
-    date: string;
-    overall_score: number;
-    weighted_score: number;
-    mention_rate: number;
-    analyses_count: number;
-  }>;
-
-  insights: {
-    top_performing_stage: AnalysisStage;
-    best_model: AIModel;
-    key_recommendations: string[];
-    performance_trend: "improving" | "declining" | "stable";
-  };
-}
-
-export interface AIAnalysisResults {
-  overallScore: number;
-  weightedScore: number;
-  promptResults: Array<{
-    promptId: string;
-    promptText: string;
-    score: number;
-    weightedScore: number;
-    mentionPosition: number | null;
-    response: string;
-    responseTime: number;
-    sentiment: {
-      overall: "positive" | "neutral" | "negative";
-      confidence: number;
-      distribution: {
-        positive: number;
-        neutral: number;
-        negative: number;
-        strongly_positive: number;
-      };
-    };
-    status: "success" | "error";
-  }>;
-  aggregatedSentiment: {
-    overall: "positive" | "neutral" | "negative";
-    confidence: number;
-    distribution: {
-      positive: number;
-      neutral: number;
-      negative: number;
-      strongly_positive: number;
-    };
-  };
-  totalResponseTime: number;
-  successRate: number;
-}
-
+/**
+ * Data Organization Service
+ *
+ * Handles the processing, storage, and organization of AI analysis results:
+ * - Processing raw AI responses into structured analysis data
+ * - Storing analysis results in the database with proper validation
+ * - Generating comprehensive dashboard metrics and insights
+ * - Calculating performance trends and comparative analytics
+ * - Organizing time-series data for visualization
+ *
+ * This service acts as the data layer between raw AI responses and
+ * the dashboard/reporting systems, ensuring data consistency and
+ * providing meaningful analytics for brand performance tracking.
+ */
 export class DataOrganizationService {
   /**
-   * Process and store comprehensive analysis results
+   * Processes and stores comprehensive AI analysis results
+   *
+   * Takes raw AI analysis results and transforms them into a structured format
+   * suitable for storage and reporting. This includes:
+   * - Performance level classification based on scores and positions
+   * - Data validation and sanitization
+   * - Metadata enrichment with user and system information
+   * - Database storage with proper error handling
+   *
+   * @param brandId - The brand being analyzed
+   * @param model - AI model used for analysis
+   * @param stage - Marketing funnel stage analyzed
+   * @param aiAnalysisResults - Raw results from AI analysis
+   * @param userId - User who initiated the analysis
+   * @param triggerType - How the analysis was triggered
+   * @returns Promise resolving to organized analysis data
+   * @throws Error if processing or storage fails
    */
   public static async processAndStoreAnalysis(
     brandId: string,
@@ -136,16 +53,16 @@ export class DataOrganizationService {
     stage: AnalysisStage,
     aiAnalysisResults: AIAnalysisResults,
     userId: string,
-    triggerType: "manual" | "scheduled" | "webhook" = "manual"
+    triggerType: TriggerType = "manual"
   ): Promise<OrganizedAnalysisData> {
     try {
-      // Get prompts for the stage to access CSV weights
+      // Retrieve prompt configurations to access weight settings
       const stagePrompts = await PromptService.getPromptsByStage(stage);
       const promptMap = new Map(stagePrompts.map((p) => [p.prompt_id, p]));
 
-      // Process each prompt result with enhanced scoring
-      const processedPromptResults = [];
-      let performanceLevel: "excellent" | "good" | "fair" | "poor";
+      // Process each prompt result with enhanced scoring and classification
+      const processedPromptResults: ProcessedPromptResult[] = [];
+      let performanceLevel: PerformanceLevel;
 
       for (const promptResult of aiAnalysisResults.promptResults) {
         const prompt = promptMap.get(promptResult.promptId);
@@ -154,7 +71,7 @@ export class DataOrganizationService {
           continue;
         }
 
-        // Determine performance level
+        // Classify performance level based on weighted score and mention position
         if (
           aiAnalysisResults.weightedScore >= 80 &&
           promptResult.mentionPosition === 1
@@ -189,7 +106,7 @@ export class DataOrganizationService {
         });
       }
 
-      // Create organized analysis data
+      // Assemble the complete organized analysis data structure
       const organizedData: OrganizedAnalysisData = {
         analysis_id: new Types.ObjectId().toString(),
         brand_id: brandId,
@@ -220,7 +137,7 @@ export class DataOrganizationService {
         },
       };
 
-      // Store in database
+      // Persist the organized data to the database
       await this.storeAnalysisData(organizedData);
 
       return organizedData;
@@ -235,13 +152,22 @@ export class DataOrganizationService {
   }
 
   /**
-   * Store organized analysis data in database
+   * Stores organized analysis data in the database with validation
+   *
+   * Performs comprehensive data validation and sanitization before storage:
+   * - Validates and clamps numeric values to acceptable ranges
+   * - Ensures sentiment distributions are properly normalized
+   * - Handles edge cases and invalid data gracefully
+   * - Creates proper MongoDB document structure
+   *
+   * @param data - Organized analysis data to store
+   * @throws Error if validation fails or database operation fails
    */
   private static async storeAnalysisData(
     data: OrganizedAnalysisData
   ): Promise<void> {
     try {
-      // Inline validation and sanitization
+      // Comprehensive data validation and sanitization to ensure data integrity
       const sanitizedOverallScore = isNaN(data.overall_score)
         ? 0
         : Math.min(Math.max(data.overall_score, 0), 100);
@@ -257,7 +183,7 @@ export class DataOrganizationService {
         ? 0
         : Math.max(data.metadata.total_processing_time, 0);
 
-      // Calculate success rate safely
+      // Calculate success rate with proper bounds checking
       const successRate =
         data.metadata.total_prompts > 0
           ? Math.min(
@@ -271,7 +197,7 @@ export class DataOrganizationService {
             )
           : 0;
 
-      // Validate sentiment distribution
+      // Validate and normalize sentiment distribution values
       const distribution = {
         positive: isNaN(data.sentiment_analysis.distribution.positive)
           ? 0
@@ -379,18 +305,28 @@ export class DataOrganizationService {
   }
 
   /**
-   * Generate comprehensive dashboard metrics
+   * Generates comprehensive dashboard metrics for brand performance analysis
+   *
+   * Creates a complete dashboard dataset including:
+   * - Brand summary information and basic metrics
+   * - Funnel performance analysis with trend calculations
+   * - Model performance comparisons and reliability metrics
+   * - Time-series data for visualization charts
+   * - AI-generated insights and recommendations
+   *
+   * @param brandId - Brand to generate metrics for
+   * @param dateRange - Time period for analysis
+   * @param filters - Optional filters for model/stage specific analysis
+   * @returns Promise resolving to comprehensive dashboard metrics
+   * @throws Error if no data found or processing fails
    */
   public static async generateDashboardMetrics(
     brandId: string,
-    dateRange: { start: Date; end: Date },
-    filters?: {
-      model?: AIModel;
-      stage?: AnalysisStage;
-    }
+    dateRange: DateRange,
+    filters?: DashboardFilters
   ): Promise<DashboardMetrics> {
     try {
-      // Build query filter
+      // Construct database query with date range and optional filters
       const filter: any = {
         brand_id: new Types.ObjectId(brandId),
         createdAt: { $gte: dateRange.start, $lte: dateRange.end },
@@ -400,7 +336,7 @@ export class DataOrganizationService {
       if (filters?.model) filter.model = filters.model;
       if (filters?.stage) filter.stage = filters.stage;
 
-      // Get analysis data
+      // Retrieve analysis data from database with population
       const analysisData = await MultiPromptAnalysis.find(filter)
         .populate("brand_id", "name")
         .sort({ createdAt: -1 })
@@ -410,22 +346,22 @@ export class DataOrganizationService {
         throw new Error("No analysis data found for the specified criteria");
       }
 
-      // Calculate funnel performance with trends
+      // Analyze funnel performance across all stages with trend analysis
       const funnelPerformance = await this.calculateFunnelPerformance(
         analysisData,
         dateRange
       );
 
-      // Calculate model performance
+      // Compare performance across different AI models
       const modelPerformance = this.calculateModelPerformance(analysisData);
 
-      // Generate time series data
+      // Create time-series data points for chart visualization
       const timeSeriesData = this.generateTimeSeriesData(
         analysisData,
         dateRange
       );
 
-      // Generate insights
+      // Generate AI-powered insights and recommendations
       const insights = this.generateDashboardInsights(
         analysisData,
         funnelPerformance,

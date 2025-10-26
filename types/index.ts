@@ -25,6 +25,9 @@ export type { AIModel, AnalysisStage } from "./brand";
 // UI component types
 export * from "./ui";
 
+// Service layer types
+export * from "./services";
+
 // Legacy member types (for backward compatibility)
 // TODO: Remove after migration is complete
 export type {

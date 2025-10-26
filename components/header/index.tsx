@@ -48,17 +48,22 @@ export default function Header() {
         {error && (
           <ApiError message={error} setMessage={(value) => setError(value)} />
         )}
-        <ModeToggle />
         {user._id && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2 px-2">
             <div className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-full">
               <UserCircle stroke="#5e6bc5" />
             </div>
-            <p className="text-base font-bold text-foreground dark:text-foreground">
-              {user?.full_name}
-            </p>
+            <div className="flex flex-col">
+              <p className="text-base font-bold text-foreground dark:text-foreground">
+                {user?.full_name}
+              </p>
+              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                {user?.email}
+              </p>
+            </div>
           </div>
         )}
+        <ModeToggle />
         <Button
           disabled={loading}
           variant={loading ? "outline" : "destructive"}

@@ -8,6 +8,7 @@ import { fetchData, postData } from "@/utils/fetch";
 import Logo from "@/components/logo";
 import Loading from "@/components/loading";
 import { InviteData } from "@/types/membership";
+import ApiError from "@/components/api-error";
 
 const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
   const router = useRouter();
@@ -223,6 +224,13 @@ const AcceptInvitePage = ({ brandId }: { brandId: string }) => {
                   "Accept Invite"
                 )}
               </Button>
+
+              {error && (
+                <ApiError
+                  message={error}
+                  setMessage={(value) => setError(value)}
+                />
+              )}
             </div>
           </>
         ) : (

@@ -27,7 +27,7 @@ import Loading from "@/components/loading";
 import FunnelHeatmap from "@/components/funnel-heatmap";
 import { models, periods, stages } from "@/constants/dashboard";
 import { Button } from "@/components/ui/button";
-// import { CreditBalance } from "@/components/credit-balance";
+import { isUserOwner } from "@/utils/checkUserRole";
 
 const DashboardPage = ({
   userId,
@@ -520,12 +520,14 @@ const DashboardPage = ({
             </div>
           </div>
           <div className="flex space-x-2">
-            <Link
-              href={`/${userId}/brands/${brandId}/edit-brand`}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              Edit Brand
-            </Link>
+            {isUserOwner(user) && (
+              <Link
+                href={`/${userId}/brands/${brandId}/edit-brand`}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Edit Brand
+              </Link>
+            )}
             <Link
               href={`/${userId}/brands/${brandId}/view-logs`}
               className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-md transition-colors"

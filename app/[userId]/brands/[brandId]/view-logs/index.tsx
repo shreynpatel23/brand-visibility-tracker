@@ -44,6 +44,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAnalysisStatus } from "@/hooks/use-analysis-status";
 import { Badge } from "@/components/ui/badge";
+import { isUserViewer } from "@/utils/checkUserRole";
 
 export default function ViewLogs({
   userId,
@@ -378,29 +379,31 @@ export default function ViewLogs({
             Monitor all AI interactions and responses for Brand {brandId}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={triggerAnalysis}
-            disabled={isRunning}
-            className={`flex items-center gap-2 ${
-              isRunning
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-primary hover:bg-primary/90"
-            }`}
-          >
-            {isRunning ? (
-              <>
-                <Clock className="w-4 h-4 animate-pulse" />
-                Analysis Running...
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" />
-                Trigger Analysis
-              </>
-            )}
-          </Button>
-        </div>
+        {!isUserViewer(user) && (
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={triggerAnalysis}
+              disabled={isRunning}
+              className={`flex items-center gap-2 ${
+                isRunning
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-primary hover:bg-primary/90"
+              }`}
+            >
+              {isRunning ? (
+                <>
+                  <Clock className="w-4 h-4 animate-pulse" />
+                  Analysis Running...
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
+                  Trigger Analysis
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Running Analysis Status */}
@@ -1156,7 +1159,6 @@ export default function ViewLogs({
           </DialogHeader>
           <div className="mt-4">
             <AnalysisModelSelector
-              userId={userId}
               brandId={brandId}
               onAnalysisStart={() => {
                 setShowAnalysisSelectorModal(false);

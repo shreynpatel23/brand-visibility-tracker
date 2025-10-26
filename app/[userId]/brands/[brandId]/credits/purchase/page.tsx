@@ -5,6 +5,7 @@ import { CreditPurchase } from "@/components/credit-purchase";
 import { CreditBalance } from "@/components/credit-balance";
 import { useUserContext } from "@/context/userContext";
 import Loading from "@/components/loading";
+import { CreditStats } from "@/types";
 
 export default function CreditPurchasePage() {
   const params = useParams();
@@ -33,9 +34,15 @@ export default function CreditPurchasePage() {
       {/* Current Balance */}
       <div className="max-w-md">
         <CreditBalance
-          userId={user._id}
           showPurchaseButton={false}
           compact={false}
+          creditData={
+            {
+              currentBalance: user.credits_balance,
+              totalPurchased: user.total_credits_purchased,
+              totalUsed: user.total_credits_used,
+            } as CreditStats
+          }
         />
       </div>
 

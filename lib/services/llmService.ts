@@ -1,32 +1,52 @@
 import axios from "axios";
+import { LLMResponse, LLMConfiguration } from "@/types/services";
 
 /**
- * LLM Response Interface
- */
-export interface LLMResponse {
-  response: string;
-  responseTime: number;
-}
-
-/**
- * LLM Service - Simple API wrappers for ChatGPT, Claude, and Gemini
+ * Large Language Model (LLM) Service
+ *
+ * Provides unified API wrappers for multiple AI language models:
+ * - OpenAI ChatGPT (GPT-3.5-turbo)
+ * - Anthropic Claude (Claude-3.5-sonnet)
+ * - Google Gemini
+ *
+ * This service handles:
+ * - API authentication and configuration
+ * - Request/response formatting for each provider
+ * - Error handling and response time tracking
+ * - Consistent response format across all models
+ *
+ * All methods return a standardized LLMResponse format regardless
+ * of the underlying API differences.
  */
 export class LLMService {
-  // AI API configuration
-  private static readonly API_KEYS = {
-    ChatGPT: process.env.OPENAI_API_KEY,
-    Claude: process.env.CLAUDE_API_KEY,
-    Gemini: process.env.GEMINI_API_KEY,
-  };
-
-  private static readonly AI_ENDPOINTS = {
-    ChatGPT: process.env.OPENAI_API_URL!,
-    Claude: process.env.CLAUDE_API_URL!,
-    Gemini: process.env.GEMINI_API_URL!,
+  /**
+   * LLM API configuration containing authentication keys and endpoints
+   * for all supported language models
+   */
+  private static readonly LLM_CONFIG: LLMConfiguration = {
+    API_KEYS: {
+      ChatGPT: process.env.OPENAI_API_KEY,
+      Claude: process.env.CLAUDE_API_KEY,
+      Gemini: process.env.GEMINI_API_KEY,
+    },
+    AI_ENDPOINTS: {
+      ChatGPT: process.env.OPENAI_API_URL!,
+      Claude: process.env.CLAUDE_API_URL!,
+      Gemini: process.env.GEMINI_API_URL!,
+    },
   };
 
   /**
-   * Call ChatGPT API with axios
+   * Calls OpenAI's ChatGPT API (GPT-3.5-turbo)
+   *
+   * Sends a prompt to ChatGPT with an optional system message that defines
+   * the AI's behavior and context. The system message helps guide the AI's
+   * responses to be more relevant and consistent.
+   *
+   * @param prompt - The user prompt/question to send to ChatGPT
+   * @param systemMessage - System-level instructions for the AI's behavior
+   * @returns Promise resolving to standardized LLM response with timing
+   * @throws Error if API key is not configured or API call fails
    */
   public static async callChatGPT(
     prompt: string,
@@ -34,13 +54,14 @@ export class LLMService {
   ): Promise<LLMResponse> {
     const startTime = Date.now();
 
-    if (!this.API_KEYS.ChatGPT) {
+    if (!this.LLM_CONFIG.API_KEYS.ChatGPT) {
       throw new Error("ChatGPT API key not configured");
     }
 
     try {
+      // Make API request to OpenAI with proper message formatting
       const response = await axios.post(
-        this.AI_ENDPOINTS.ChatGPT,
+        this.LLM_CONFIG.AI_ENDPOINTS.ChatGPT,
         {
           model: "gpt-3.5-turbo",
           messages: [
@@ -50,18 +71,20 @@ export class LLMService {
         },
         {
           headers: {
-            Authorization: `Bearer ${this.API_KEYS.ChatGPT}`,
+            Authorization: `Bearer ${this.LLM_CONFIG.API_KEYS.ChatGPT}`,
           },
         }
       );
 
       const { data } = response;
 
+      // Extract response content and calculate timing
       return {
         response: data?.choices[0]?.message?.content,
         responseTime: Date.now() - startTime,
       };
     } catch (error) {
+      // Handle API errors with detailed error information
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const message = error.response?.data?.error?.message || error.message;
@@ -76,7 +99,16 @@ export class LLMService {
   }
 
   /**
-   * Call Claude API with axios
+   * Calls Anthropic's Claude API (Claude-3.5-sonnet)
+   *
+   * Sends a prompt to Claude with system-level instructions. Claude uses
+   * a different API format than ChatGPT, with separate system and message
+   * parameters, and requires specific headers for authentication.
+   *
+   * @param prompt - The user prompt/question to send to Claude
+   * @param systemMessage - System-level instructions for Claude's behavior
+   * @returns Promise resolving to standardized LLM response with timing
+   * @throws Error if API key is not configured or API call fails
    */
   public static async callClaude(
     prompt: string,
@@ -84,13 +116,14 @@ export class LLMService {
   ): Promise<LLMResponse> {
     const startTime = Date.now();
 
-    if (!this.API_KEYS.Claude) {
+    if (!this.LLM_CONFIG.API_KEYS.Claude) {
       throw new Error("Claude API key not configured");
     }
 
     try {
+      // Make API request to Anthropic with Claude-specific formatting
       const response = await axios.post(
-        this.AI_ENDPOINTS.Claude,
+        this.LLM_CONFIG.AI_ENDPOINTS.Claude,
         {
           model: "claude-3-5-sonnet-20240620",
           max_tokens: 1000,
@@ -99,7 +132,7 @@ export class LLMService {
         },
         {
           headers: {
-            "x-api-key": this.API_KEYS.Claude,
+            "x-api-key": this.LLM_CONFIG.API_KEYS.Claude,
             "anthropic-version": "2023-06-01",
           },
         }
@@ -107,11 +140,13 @@ export class LLMService {
 
       const { data } = response;
 
+      // Extract response content from Claude's response format
       return {
         response: data?.content[0]?.text,
         responseTime: Date.now() - startTime,
       };
     } catch (error) {
+      // Handle Claude API errors with detailed error information
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const message = error.response?.data?.error?.message || error.message;
@@ -126,7 +161,16 @@ export class LLMService {
   }
 
   /**
-   * Call Gemini API with axios
+   * Calls Google's Gemini API
+   *
+   * Sends a prompt to Gemini with system instructions. Gemini uses a different
+   * API format that combines system and user messages into a single prompt.
+   * The API uses Google's specific authentication and request format.
+   *
+   * @param prompt - The user prompt/question to send to Gemini
+   * @param systemMessage - System-level instructions for Gemini's behavior
+   * @returns Promise resolving to standardized LLM response with timing
+   * @throws Error if API key is not configured or API call fails
    */
   public static async callGemini(
     prompt: string,
@@ -134,32 +178,36 @@ export class LLMService {
   ): Promise<LLMResponse> {
     const startTime = Date.now();
 
-    if (!this.API_KEYS.Gemini) {
+    if (!this.LLM_CONFIG.API_KEYS.Gemini) {
       throw new Error("Gemini API key not configured");
     }
 
+    // Combine system message and prompt for Gemini's format
     const geminiPrompt = `${systemMessage}\n\n${prompt}`;
 
     try {
+      // Make API request to Google Gemini with proper formatting
       const response = await axios.post(
-        this.AI_ENDPOINTS.Gemini,
+        this.LLM_CONFIG.AI_ENDPOINTS.Gemini,
         {
           contents: [{ parts: [{ text: geminiPrompt }] }],
         },
         {
           headers: {
-            "x-goog-api-key": this.API_KEYS.Gemini,
+            "x-goog-api-key": this.LLM_CONFIG.API_KEYS.Gemini,
           },
         }
       );
 
       const { data } = response;
 
+      // Extract response content from Gemini's response format
       return {
         response: data?.candidates[0]?.content?.parts[0]?.text,
         responseTime: Date.now() - startTime,
       };
     } catch (error) {
+      // Handle Gemini API errors with detailed error information
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const message = error.response?.data?.error?.message || error.message;

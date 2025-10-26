@@ -4,7 +4,21 @@ import { cookies } from "next/headers";
 import { isRouteProtected } from "./utils/checkProtectedRoutes";
 
 export const config = {
-  matcher: ["/api/:path*", "/:userId/brands/:path*"],
+  matcher: [
+    "/api/credit/:path*",
+    "/api/analysis/:path*",
+    "/api/brand/:brandId/analysis-status/:path*",
+    "/api/brand/:brandId/dashboard/:path*",
+    "/api/brand/:brandId/invites/:path*",
+    "/api/brand/:brandId/logs/:path*",
+    "/api/brand/:brandId/members/:path*",
+    "/api/brand/:brandId/transactions/:path*",
+    "/api/brand/:brandId/matrix/:path*",
+    "/api/brand/matrix-summary/:path*",
+    "/api/run-analysis/:path*",
+    "/api/users/:path*",
+    "/:userId/brands/:path*",
+  ],
 };
 
 export default async function middleware(request: NextRequest) {
@@ -34,6 +48,7 @@ export default async function middleware(request: NextRequest) {
   ) {
     // get the authResult form the authMiddleware
     const authResult = await authMiddleware(request);
+    console.log(config.matcher);
     // if it is false then return access denined
     if (!authResult.isValid) {
       return new NextResponse(JSON.stringify({ message: "Access Denied!" }), {

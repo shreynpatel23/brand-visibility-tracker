@@ -1,42 +1,66 @@
 import { AIModel, AnalysisStage, IBrand } from "@/types/brand";
+import {
+  SentimentAnalysis,
+  StageSpecificWeights,
+  AIAnalysisResult,
+  ParsedAIResponse,
+  StageAnalysisPrompt,
+  AIAnalysisResults,
+} from "@/types/services";
 import { LLMService } from "./llmService";
-import { PromptService, StageSpecificWeights } from "./promptService";
-import { AIAnalysisResults } from "./dataOrganizationService";
+import { PromptService } from "./promptService";
 
+/**
+ * AI Service Class
+ *
+ * Handles all AI-related operations including:
+ * - Brand analysis using multiple AI models (ChatGPT, Claude, Gemini)
+ * - Stage-specific analysis (TOFU, MOFU, BOFU, EVFU)
+ * - Multi-prompt analysis with weighted scoring
+ * - Sentiment analysis and response parsing
+ *
+ * This service acts as the main orchestrator for AI analysis workflows,
+ * coordinating between different AI models and processing their responses
+ * into structured, actionable insights.
+ */
 export class AIService {
-  // AI API configuration
-  private static readonly API_KEYS = {
-    ChatGPT: process.env.OPENAI_API_KEY,
-    Claude: process.env.CLAUDE_API_KEY,
-    Gemini: process.env.GEMINI_API_KEY,
-  };
-
-  private static readonly AI_ENDPOINTS = {
-    ChatGPT: process.env.OPENAI_API_URL!,
-    Claude: process.env.CLAUDE_API_URL!,
-    Gemini: process.env.GEMINI_API_URL!,
-  };
-
+  /**
+   * Computes stage-specific scores based on AI response values and predefined weights
+   *
+   * Each funnel stage has different scoring criteria:
+   * - TOFU: Position-based scoring (first, second, third, etc.)
+   * - MOFU: Tone-based scoring (positive, conditional, neutral, etc.)
+   * - BOFU: Intent-based scoring (yes, partial, unclear, etc.)
+   * - EVFU: Sentiment-based scoring (recommend, caveat, neutral, etc.)
+   *
+   * @param stage - The marketing funnel stage being analyzed
+   * @param value - The AI response value to score
+   * @param weights - Stage-specific weight configuration
+   * @param baseWeight - Base weight multiplier for the score
+   * @returns Object containing raw score and weighted score
+   */
   private static computeStageSpecificScore(
-    stage: "TOFU" | "MOFU" | "BOFU" | "EVFU",
+    stage: AnalysisStage,
     value: string,
-    weights: any,
+    weights: StageSpecificWeights,
     baseWeight: number
   ): { rawScore: number; weightedScore: number } {
     let stageMap: Record<string, number> = {};
 
+    // Map the appropriate weight scale based on the funnel stage
+
     switch (stage) {
       case "TOFU":
-        stageMap = weights.position_weights;
+        stageMap = weights.position_weights || {};
         break;
       case "MOFU":
-        stageMap = weights.mofu_scale;
+        stageMap = weights.mofu_scale || {};
         break;
       case "BOFU":
-        stageMap = weights.bofu_scale;
+        stageMap = weights.bofu_scale || {};
         break;
       case "EVFU":
-        stageMap = weights.evfu_scale;
+        stageMap = weights.evfu_scale || {};
         break;
     }
 
@@ -46,21 +70,24 @@ export class AIService {
   }
 
   /**
-   * Get the system prompt for the given stage
-   * @param response - The response from the AI model
-   * @param stage - The stage of the marketing funnel to analyze
-   * @param brandData - The brand data to use in the prompt
-   * @returns The system prompt for the given stage
+   * Generates stage-specific analysis prompts for AI evaluation
+   *
+   * Creates tailored prompts that instruct the AI to analyze responses
+   * according to the specific criteria of each marketing funnel stage.
+   * Each stage has unique evaluation parameters and expected response formats.
+   *
+   * @param prompt - The original question/prompt that was asked
+   * @param response - The AI model's response to be analyzed
+   * @param stage - The marketing funnel stage (TOFU, MOFU, BOFU, EVFU)
+   * @param brandData - Brand information for context
+   * @returns Structured prompt configuration with system message and user prompt
    */
   private static getStageSpeficAnalysisPrompt(
     prompt: string,
     response: string,
     stage: AnalysisStage,
     brandData: IBrand
-  ): {
-    systemMessage: string;
-    prompt: string;
-  } {
+  ): StageAnalysisPrompt {
     const {
       name,
       category,
@@ -71,7 +98,7 @@ export class AIService {
       feature_list,
     } = brandData;
 
-    // // Common dynamic info block
+    // Generate comprehensive brand context for AI analysis
     const brandSummary = `
         Brand Context:
         - Brand Name: ${name || "Unknown Brand"}
@@ -264,7 +291,18 @@ export class AIService {
   }
 
   /**
-   * Parse AI response to extract structured data with proper stage-specific scoring
+   * Parses AI responses and extracts structured analysis data
+   *
+   * This method takes raw AI responses and converts them into structured data
+   * with proper scoring, sentiment analysis, and stage-specific classifications.
+   * It handles JSON parsing, error recovery, and applies stage-specific scoring logic.
+   *
+   * @param prompt - The original prompt that generated the response
+   * @param data - Raw AI response data to parse
+   * @param brandData - Brand context information
+   * @param stage - Marketing funnel stage for scoring context
+   * @param weights - Stage-specific weight configuration
+   * @returns Parsed response with scores, sentiment, and analysis
    */
   private static async parseAIResponse(
     prompt: string,
@@ -272,23 +310,7 @@ export class AIService {
     brandData: IBrand,
     stage?: string,
     weights?: StageSpecificWeights
-  ): Promise<{
-    score: number;
-    position_weighted_score: number;
-    mentionPosition: number | null;
-    analysis: string;
-    sentiment: {
-      overall: "positive" | "neutral" | "negative";
-      confidence: number;
-      distribution: {
-        positive: number;
-        neutral: number;
-        negative: number;
-        strongly_positive: number;
-      };
-    };
-    status: "success" | "error";
-  }> {
+  ): Promise<ParsedAIResponse> {
     const aiResponse = await LLMService.callChatGPT(
       this.getStageSpeficAnalysisPrompt(
         prompt,
@@ -309,13 +331,14 @@ export class AIService {
     } catch (error) {
       console.error("JSON parsing error:", error);
       console.error("Raw AI response:", aiResponse.response);
+      // Create error response with default values when JSON parsing fails
       response = {
         score: 0,
         position_weighted_score: 0,
         mentionPosition: null,
         analysis: `JSON parsing failed. Raw response: ${aiResponse.response}`,
         sentiment: {
-          overall: "neutral",
+          overall: "neutral" as const,
           confidence: 0,
           distribution: {
             positive: 0,
@@ -324,7 +347,7 @@ export class AIService {
             strongly_positive: 0,
           },
         },
-        status: "error",
+        status: "error" as const,
       };
     }
 
@@ -332,8 +355,11 @@ export class AIService {
       return response;
     }
 
+    // Extract stage-specific values and convert to mention positions
     let value = "";
     let mentionedPosition = null;
+
+    // Map AI response values to numerical positions based on stage type
     switch (stage) {
       case "TOFU":
         value = response.rank;
@@ -396,7 +422,7 @@ export class AIService {
     const { rawScore, weightedScore } = this.computeStageSpecificScore(
       stage as AnalysisStage,
       value,
-      weights,
+      weights || { base_weight: 1 },
       weights?.base_weight || 1
     );
 
@@ -411,7 +437,11 @@ export class AIService {
   }
 
   /**
-   * Create a structured prompt that ensures AI provides all required metrics
+   * System message template for AI models
+   *
+   * This message provides consistent instructions across all AI models,
+   * ensuring they understand the context and respond appropriately for
+   * different marketing funnel stages.
    */
   private static readonly systemMessage = `You are a helpful assistant tasked with answering business discovery questions using general market knowledge and logical inference.
 
@@ -429,7 +459,21 @@ export class AIService {
     - Do Not include the stage name in your response. (like MOFU Response, TOFU Response, etc.)`;
 
   /**
-   * Analyze brand with a single AI model and prompt
+   * Analyzes a brand using a single AI model and prompt
+   *
+   * This is the core analysis method that:
+   * 1. Calls the specified AI model with the given prompt
+   * 2. Parses the response using stage-specific logic
+   * 3. Calculates weighted scores based on mention position
+   * 4. Extracts sentiment analysis data
+   * 5. Returns structured analysis results
+   *
+   * @param model - AI model to use (ChatGPT, Claude, or Gemini)
+   * @param prompt - Analysis prompt to send to the AI
+   * @param brandData - Brand information for context
+   * @param stage - Marketing funnel stage for scoring
+   * @param weights - Stage-specific weight configuration
+   * @returns Complete analysis result with scores and sentiment
    */
   public static async analyzeBrand(
     model: AIModel,
@@ -437,28 +481,11 @@ export class AIService {
     brandData: IBrand,
     stage?: string,
     weights?: StageSpecificWeights
-  ): Promise<{
-    score: number;
-    position_weighted_score: number;
-    response: string;
-    responseTime: number;
-    sentiment: {
-      overall: "positive" | "neutral" | "negative";
-      confidence: number;
-      distribution: {
-        positive: number;
-        neutral: number;
-        negative: number;
-        strongly_positive: number;
-      };
-    };
-    mentionPosition: number | null;
-    analysis: string;
-    status: "success" | "error";
-  }> {
+  ): Promise<AIAnalysisResult> {
     try {
       let aiResponse: { response: string; responseTime: number };
-      // Call the appropriate AI model
+
+      // Route to the appropriate AI model based on the model parameter
       switch (model) {
         case "ChatGPT":
           aiResponse = await LLMService.callChatGPT(prompt, this.systemMessage);
@@ -494,6 +521,7 @@ export class AIService {
       };
     } catch (error) {
       console.error(`AI Analysis Error for ${model}:`, error);
+      // Return error response with default values when analysis fails
       return {
         score: 0,
         position_weighted_score: 0,
@@ -502,7 +530,7 @@ export class AIService {
         }`,
         responseTime: 0,
         sentiment: {
-          overall: "negative",
+          overall: "negative" as const,
           confidence: 0,
           distribution: {
             positive: 0,
@@ -513,34 +541,50 @@ export class AIService {
         },
         mentionPosition: 0,
         analysis: "Analysis failed due to API error",
-        status: "error",
+        status: "error" as const,
       };
     }
   }
 
   /**
-   * Multi-prompt analysis for a single model and stage
+   * Performs comprehensive multi-prompt analysis for a single model and stage
+   *
+   * This method orchestrates the complete analysis workflow:
+   * 1. Retrieves all prompts for the specified stage
+   * 2. Processes each prompt with the AI model
+   * 3. Aggregates results across all prompts
+   * 4. Calculates overall scores and sentiment
+   * 5. Computes success rates and performance metrics
+   *
+   * This is the primary method used for comprehensive brand analysis,
+   * providing detailed insights across multiple evaluation criteria.
+   *
+   * @param brandData - Complete brand information for analysis
+   * @param model - AI model to use for analysis
+   * @param stage - Marketing funnel stage to analyze
+   * @returns Aggregated analysis results with detailed metrics
    */
   public static async analyzeWithMultiplePrompts(
-    brandData: any,
+    brandData: IBrand,
     model: AIModel,
     stage: AnalysisStage
   ): Promise<AIAnalysisResults> {
     try {
-      // Get prompts for the specific stage
+      // Retrieve all prompts configured for this marketing funnel stage
       const stagePrompts = await PromptService.getPromptsByStage(stage);
 
       if (stagePrompts.length === 0) {
         throw new Error(`No prompts found for stage: ${stage}`);
       }
 
+      // Initialize tracking variables for aggregation
       const promptResults = [];
       let totalResponseTime = 0;
       let successfulPrompts = 0;
       let totalWeightedScore = 0;
       let totalWeightSum = 0;
 
-      // Aggregate sentiment data
+      // Initialize sentiment aggregation tracking
       const sentimentScores = {
         positive: 0,
         neutral: 0,
@@ -548,15 +592,16 @@ export class AIService {
         strongly_positive: 0,
       };
 
+      // Process each prompt individually and aggregate results
       for (const prompt of stagePrompts) {
         try {
-          // Replace placeholders in prompt
+          // Replace brand-specific placeholders in the prompt template
           const processedPromptText = PromptService.replacePromptPlaceholders(
             prompt.prompt_text,
             brandData
           );
 
-          // Analyze with AI model (AI now calculates weighted scores)
+          // Perform AI analysis with the processed prompt
           const analysisResult = await this.analyzeBrand(
             model,
             processedPromptText,
@@ -577,12 +622,13 @@ export class AIService {
             status: analysisResult.status,
           });
 
+          // Aggregate successful analysis results
           if (analysisResult.status === "success") {
             successfulPrompts++;
             totalWeightedScore += analysisResult.position_weighted_score * 100;
             totalWeightSum += 1;
 
-            // Aggregate sentiment data
+            // Accumulate sentiment distribution data for overall sentiment calculation
             Object.keys(sentimentScores).forEach((key) => {
               sentimentScores[key as keyof typeof sentimentScores] +=
                 analysisResult.sentiment.distribution[
@@ -593,11 +639,12 @@ export class AIService {
 
           totalResponseTime += analysisResult.responseTime;
 
-          // Add delay to avoid rate limiting
+          // Add delay between API calls to respect rate limits and avoid overwhelming the AI services
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (error) {
           console.error(`Error analyzing prompt ${prompt.prompt_id}:`, error);
 
+          // Create error result entry for failed prompt analysis
           promptResults.push({
             promptId: prompt.prompt_id,
             promptText: PromptService.replacePromptPlaceholders(
@@ -627,7 +674,9 @@ export class AIService {
         }
       }
 
-      // Calculate overall metrics
+      // Calculate comprehensive performance metrics
+
+      // Overall score: average of all successful prompt scores
       const overallScore =
         successfulPrompts > 0
           ? promptResults
@@ -636,25 +685,16 @@ export class AIService {
             successfulPrompts
           : 0;
 
-      // calculate average weighted score
+      // Weighted score: incorporates position-based weighting for more accurate assessment
       const weightedScore =
         totalWeightSum > 0 ? totalWeightedScore / totalWeightSum : 0;
 
-      // calculate success rate
+      // Success rate: percentage of prompts that completed successfully
       const successRate = (successfulPrompts / stagePrompts.length) * 100;
 
-      // Calculate aggregated sentiment
+      // Calculate aggregated sentiment analysis across all successful prompts
       const totalSentimentResponses = successfulPrompts;
-      const aggregatedSentiment: {
-        overall: "positive" | "neutral" | "negative";
-        confidence: number;
-        distribution: {
-          positive: number;
-          neutral: number;
-          negative: number;
-          strongly_positive: number;
-        };
-      } = {
+      const aggregatedSentiment: SentimentAnalysis = {
         overall: "neutral",
         confidence: 0,
         distribution: {
@@ -665,12 +705,14 @@ export class AIService {
         },
       };
 
+      // Process sentiment data only if we have successful responses
       if (totalSentimentResponses > 0) {
-        // Calculate normalized percentages
+        // Calculate normalized percentages for sentiment distribution
         const total = Object.values(sentimentScores).reduce(
           (sum, val) => sum + val,
           0
         );
+
         if (total > 0) {
           aggregatedSentiment.distribution = {
             positive: Math.round((sentimentScores.positive / total) * 100),
@@ -682,14 +724,14 @@ export class AIService {
           };
         }
 
-        // Determine overall sentiment
+        // Determine overall sentiment based on positive vs negative balance
         if (sentimentScores.positive > sentimentScores.negative) {
           aggregatedSentiment.overall = "positive";
         } else if (sentimentScores.negative > sentimentScores.positive) {
           aggregatedSentiment.overall = "negative";
         }
 
-        // Calculate confidence
+        // Calculate confidence level based on the dominant sentiment
         aggregatedSentiment.confidence = Math.round(
           (Math.max(...Object.values(sentimentScores)) /
             totalSentimentResponses) *
@@ -710,7 +752,11 @@ export class AIService {
         `Multi-prompt analysis error for ${model}-${stage}:`,
         error
       );
-      throw error;
+      throw new Error(
+        `Failed to complete multi-prompt analysis: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 }

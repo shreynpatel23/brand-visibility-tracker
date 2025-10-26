@@ -483,6 +483,14 @@ export const POST = async (
 
     const { userId, models, stages } = parse.data;
 
+    // check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return new NextResponse(JSON.stringify({ message: "User not found!" }), {
+        status: 404,
+      });
+    }
+
     // Check user permissions (owner or member with appropriate role)
     const membership = await Membership.findOne({
       brand_id: brandId,
@@ -615,9 +623,14 @@ export const POST = async (
 
     await AnalysisPair.insertMany(pairDocuments);
 
+    let newBalance: number = user.credits_balance;
+    let totalCreditUsed: number = user.total_credits_used;
     // Deduct credits before starting analysis
     try {
-      await CreditService.deductCredits(
+      const {
+        newBalance: newBalanceResult,
+        totalCreditUsed: totalCreditUsedResult,
+      } = await CreditService.deductCredits(
         userId,
         validation.creditsNeeded,
         analysisId,
@@ -625,6 +638,8 @@ export const POST = async (
           ", "
         )} - ${stagesToAnalyze.join(", ")})`
       );
+      newBalance = newBalanceResult;
+      totalCreditUsed = totalCreditUsedResult;
     } catch (error) {
       console.error("Error deducting credits:", error);
       return new NextResponse(
@@ -659,6 +674,8 @@ export const POST = async (
             creditsUsed: validation.creditsNeeded,
             modelsAnalyzed: modelsToAnalyze,
             stagesAnalyzed: stagesToAnalyze,
+            newBalance,
+            totalCreditUsed,
           },
         }),
         {
@@ -703,6 +720,8 @@ export const POST = async (
           creditsUsed: validation.creditsNeeded,
           modelsAnalyzed: modelsToAnalyze,
           stagesAnalyzed: stagesToAnalyze,
+          newBalance,
+          totalCreditUsed,
         },
       }),
       {
