@@ -36,6 +36,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { isUserOwner } from "@/utils/checkUserRole";
+import { useUserContext } from "@/context/userContext";
 
 export default function MembersPage({
   userId,
@@ -44,6 +46,7 @@ export default function MembersPage({
   userId: string;
   brandId: string;
 }) {
+  const { user } = useUserContext();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,14 +83,6 @@ export default function MembersPage({
       setDebouncedSearchTerm("");
     }
   }, []);
-
-  // Get current user's role and member info
-  const currentUser = teamMembers.find((member) => member.userId === userId);
-  const currentUserRole = currentUser?.role || null;
-
-  // Check if current user can perform admin actions (owner or admin)
-  const canPerformActions =
-    currentUserRole && ["owner", "admin"].includes(currentUserRole);
 
   const fetchMembers = async () => {
     try {
@@ -265,7 +260,7 @@ export default function MembersPage({
             Manage team access and permissions for this brand
           </p>
         </div>
-        {canPerformActions && (
+        {isUserOwner(user) && (
           <Button
             onClick={() => setShowInviteForm(!showInviteForm)}
             className="flex items-center gap-2"
@@ -531,7 +526,7 @@ export default function MembersPage({
                           </span>
                         </td>
                         <td className="py-4 px-4 text-right">
-                          {canPerformActions ? (
+                          {isUserOwner(user) ? (
                             <div className="flex items-center justify-end gap-2">
                               {member.status === "pending" &&
                                 member.invitedBy?._id === userId && (
@@ -599,7 +594,7 @@ export default function MembersPage({
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 Invite team members to collaborate on this brand.
               </p>
-              {canPerformActions && (
+              {isUserOwner(user) && (
                 <div className="mt-6">
                   <Button onClick={() => setShowInviteForm(true)}>
                     <UserPlus className="w-4 h-4 mr-2" />

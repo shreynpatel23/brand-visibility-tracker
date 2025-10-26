@@ -39,6 +39,7 @@ import Loading from "@/components/loading";
 import { toast } from "sonner";
 import { CreditBalance } from "@/components/credit-balance";
 import { CreditStats } from "@/types";
+import { isUserOwner } from "@/utils/checkUserRole";
 
 interface BrandLayoutProps {
   children: React.ReactNode;
@@ -55,7 +56,7 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
   const [error, setError] = useState("");
 
   // context
-  const { user } = useUserContext();
+  const { user, setUser } = useUserContext();
 
   useEffect(() => {
     async function fetchBrandName() {
@@ -76,6 +77,29 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
 
     if (brandId && userId) {
       fetchBrandName();
+    }
+  }, [userId, brandId]);
+
+  useEffect(() => {
+    async function fetchUserRole() {
+      try {
+        const response = await fetchData(
+          `/api/users/${userId}/fetch-role?brandId=${brandId}`
+        );
+        const { data } = response;
+        setUser({ ...user, role: data.role });
+      } catch (error) {
+        setError(
+          `Error fetching user role - ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (userId && brandId) {
+      fetchUserRole();
     }
   }, [userId, brandId]);
 
@@ -138,13 +162,15 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
     },
   ];
 
-  const settingsItems = [
-    {
-      title: "Brand Settings",
-      url: `/${userId}/brands/${brandId}/edit-brand`,
-      icon: Settings,
-    },
-  ];
+  const settingsItems = isUserOwner(user)
+    ? [
+        {
+          title: "Brand Settings",
+          url: `/${userId}/brands/${brandId}/edit-brand`,
+          icon: Settings,
+        },
+      ]
+    : [];
 
   return (
     <SidebarProvider>
@@ -211,27 +237,29 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
             </SidebarGroupContent>
           </SidebarGroup>
 
-          <SidebarGroup>
-            <SidebarGroupLabel>Settings</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {settingsItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.url}
-                      tooltip={item.title}
-                    >
-                      <Link href={item.url}>
-                        <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          {settingsItems.length > 0 && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Settings</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {settingsItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname === item.url}
+                        tooltip={item.title}
+                      >
+                        <Link href={item.url}>
+                          <item.icon className="size-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
 
         <SidebarFooter>

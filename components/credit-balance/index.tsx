@@ -1,14 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Coins, Plus, TrendingUp, TrendingDown } from "lucide-react";
-import { toast } from "sonner";
-import Loading from "../loading";
 import { useRouter } from "next/navigation";
-import { fetchData } from "@/utils/fetch";
-import formatCredits from "@/lib/utils/formatCredits";
+import formatCredits from "@/utils/formatCredits";
 
 interface CreditStats {
   currentBalance: number;

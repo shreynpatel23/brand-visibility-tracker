@@ -16,6 +16,7 @@ export interface IUser {
   total_credits_purchased?: number;
   total_credits_used?: number;
   stripe_customer_id?: string;
+  role?: "owner" | "admin" | "viewer";
 }
 
 // Authentication API responses

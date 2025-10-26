@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import formatCredits from "@/lib/utils/formatCredits";
+import formatCredits from "@/utils/formatCredits";
 
 interface TransactionHistoryResponse {
   message: string;
