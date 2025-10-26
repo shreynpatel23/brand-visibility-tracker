@@ -1,26 +1,39 @@
 import Stripe from "stripe";
 import { CreditService } from "./creditService";
 import User from "@/lib/models/user";
+import { CreditPackage } from "@/types/services";
 
+// Validate Stripe configuration on module load
 if (!process.env.STRIPE_PRIVATE_KEY) {
   throw new Error("STRIPE_PRIVATE_KEY is not set in environment variables");
 }
 
+// Initialize Stripe client with private key
 const stripe = new Stripe(process.env.STRIPE_PRIVATE_KEY);
 
-export interface CreditPackage {
-  id: string;
-  name: string;
-  credits: number;
-  price: number; // in cents
-  priceId: string;
-  popular?: boolean;
-  bonusCredits?: number;
-  description: string;
-}
-
+/**
+ * Stripe Payment Service
+ *
+ * Handles all Stripe-related payment operations for credit purchases:
+ * - Customer management and creation
+ * - Payment intent creation for card payments
+ * - Checkout session management for hosted payment flows
+ * - Webhook handling for payment confirmations
+ * - Refund processing and payment history
+ *
+ * This service integrates with the CreditService to automatically
+ * add credits to user accounts upon successful payments.
+ */
 export class StripeService {
-  // Predefined credit packages based on your pricing structure
+  /**
+   * Predefined credit packages with pricing and configuration
+   *
+   * Each package includes:
+   * - Credit amount and pricing in cents (USD)
+   * - Stripe price ID for checkout sessions
+   * - Marketing flags (popular packages)
+   * - Bonus credits for promotional offers
+   */
   public static readonly CREDIT_PACKAGES: CreditPackage[] = [
     {
       id: "small_pack",

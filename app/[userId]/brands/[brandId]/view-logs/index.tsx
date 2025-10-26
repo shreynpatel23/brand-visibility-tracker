@@ -1156,7 +1156,6 @@ export default function ViewLogs({
           </DialogHeader>
           <div className="mt-4">
             <AnalysisModelSelector
-              userId={userId}
               brandId={brandId}
               onAnalysisStart={() => {
                 setShowAnalysisSelectorModal(false);

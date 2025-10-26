@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { CreditBalance } from "@/components/credit-balance";
 import { postData } from "@/utils/fetch";
 import Loading from "../loading";
+import { CreditStats } from "@/types";
+import { useUserContext } from "@/context/userContext";
 
 interface AnalysisEstimate {
   creditsRequired: number;
@@ -28,7 +30,6 @@ interface AnalysisEstimate {
 }
 
 interface AnalysisModelSelectorProps {
-  userId: string;
   brandId: string;
   onAnalysisStart?: (data: any) => void;
   disabled?: boolean;
@@ -56,11 +57,11 @@ const AI_MODELS = [
 ];
 
 export function AnalysisModelSelector({
-  userId,
   brandId,
   onAnalysisStart,
   disabled = false,
 }: AnalysisModelSelectorProps) {
+  const { user, setUser } = useUserContext();
   const [selectedModels, setSelectedModels] = useState<string[]>([
     "ChatGPT",
     "Claude",
@@ -81,7 +82,7 @@ export function AnalysisModelSelector({
       setEstimating(true);
       const response = await postData("/api/analysis/estimate", {
         models: selectedModels,
-        userId,
+        userId: user._id,
       });
       const { data } = response;
       setEstimate(data);
@@ -122,12 +123,17 @@ export function AnalysisModelSelector({
     try {
       setLoading(true);
       const response = await postData(`/api/brand/${brandId}/logs`, {
-        userId,
+        userId: user._id,
         models: selectedModels,
         stages: ["TOFU", "MOFU", "BOFU", "EVFU"], // Always all stages
       });
 
       const { data } = response;
+      setUser({
+        ...user,
+        credits_balance: data.newBalance,
+        total_credits_used: data.totalCreditUsed,
+      });
       toast.success("Analysis started successfully!");
 
       if (onAnalysisStart) {
@@ -149,7 +155,16 @@ export function AnalysisModelSelector({
   return (
     <div className="space-y-4">
       {/* Credit Balance */}
-      <CreditBalance userId={userId} compact={true} />
+      <CreditBalance
+        compact={true}
+        creditData={
+          {
+            currentBalance: user.credits_balance,
+            totalPurchased: user.total_credits_purchased,
+            totalUsed: user.total_credits_used,
+          } as CreditStats
+        }
+      />
 
       {/* Model Selection */}
       <div className="mb-8">

@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import Loading from "@/components/loading";
 import { toast } from "sonner";
 import { CreditBalance } from "@/components/credit-balance";
+import { CreditStats } from "@/types";
 
 interface BrandLayoutProps {
   children: React.ReactNode;
@@ -276,9 +277,15 @@ const BrandLayout: React.FC<BrandLayoutProps> = ({ children }) => {
             )}
             {user._id && (
               <CreditBalance
-                userId={user._id}
                 compact={true}
                 purchaseUrl={`/${userId}/brands/${brandId}/credits/purchase`}
+                creditData={
+                  {
+                    currentBalance: user.credits_balance,
+                    totalPurchased: user.total_credits_purchased,
+                    totalUsed: user.total_credits_used,
+                  } as CreditStats
+                }
               />
             )}
             {user._id && (

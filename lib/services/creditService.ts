@@ -1,28 +1,66 @@
 import User from "@/lib/models/user";
 import CreditTransaction from "@/lib/models/creditTransaction";
 import { AIModel } from "@/types/plans";
+import {
+  CreditCosts,
+  CreditBalanceCheck,
+  CreditOperationResult,
+} from "@/types/services";
 
+/**
+ * Credit Management Service
+ *
+ * Handles all credit-related operations for the brand analysis platform:
+ * - Credit balance management and tracking
+ * - Credit deduction for analysis operations
+ * - Credit purchase and bonus allocation
+ * - Transaction history and reporting
+ * - Analysis cost calculation and validation
+ *
+ * This service ensures proper credit accounting and prevents unauthorized
+ * usage by validating credit availability before expensive operations.
+ */
 export class CreditService {
-  // Credit costs per model (for all stages)
-  private static readonly CREDIT_COSTS = {
+  /**
+   * Credit cost configuration for different analysis operations
+   *
+   * Currently uses a flat rate per model that covers all funnel stages
+   * (TOFU, MOFU, BOFU, EVFU) in a single analysis run.
+   */
+  private static readonly CREDIT_COSTS: CreditCosts = {
     per_model_all_stages: 10,
   };
 
   /**
-   * Calculate credits needed for analysis
-   * Now calculates based on models only (all stages included)
+   * Calculates the total credits needed for a multi-model analysis
+   *
+   * Each AI model runs through all marketing funnel stages (TOFU, MOFU, BOFU, EVFU)
+   * in a single analysis operation. The cost is calculated per model, with all
+   * stages included in the base cost.
+   *
+   * @param models - Array of AI models to be used in the analysis
+   * @returns Total credits required for the analysis
    */
   public static calculateCreditsNeeded(models: AIModel[]): number {
     return models.length * this.CREDIT_COSTS.per_model_all_stages;
   }
 
   /**
-   * Check if user has enough credits for analysis
+   * Checks if a user has sufficient credits for a requested operation
+   *
+   * Validates the user's current credit balance against the required amount
+   * for an analysis or other credit-consuming operation. This check should
+   * be performed before any expensive operations to prevent overdrafts.
+   *
+   * @param userId - The user's unique identifier
+   * @param requiredCredits - Number of credits needed for the operation
+   * @returns Promise resolving to credit availability status and current balance
+   * @throws Error if user is not found
    */
   public static async hasEnoughCredits(
     userId: string,
     requiredCredits: number
-  ): Promise<{ hasEnough: boolean; currentBalance: number }> {
+  ): Promise<CreditBalanceCheck> {
     const user = await User.findById(userId);
     if (!user) {
       throw new Error("User not found");
@@ -36,19 +74,35 @@ export class CreditService {
   }
 
   /**
-   * Deduct credits for analysis
+   * Deducts credits from a user's account for analysis operations
+   *
+   * Performs an atomic transaction to:
+   * 1. Verify the user has sufficient credits
+   * 2. Deduct the specified amount from their balance
+   * 3. Update their total usage statistics
+   * 4. Record the transaction for audit purposes
+   *
+   * Uses database transactions to ensure data consistency and prevent
+   * race conditions in concurrent credit operations.
+   *
+   * @param userId - The user's unique identifier
+   * @param amount - Number of credits to deduct
+   * @param analysisId - ID of the analysis this deduction is for
+   * @param description - Human-readable description of the operation
+   * @returns Promise resolving to operation result and new balance
+   * @throws Error if user not found or insufficient credits
    */
   public static async deductCredits(
     userId: string,
     amount: number,
     analysisId: string,
     description: string
-  ): Promise<{ success: boolean; newBalance: number }> {
+  ): Promise<CreditOperationResult> {
     const session = await User.startSession();
 
     try {
       await session.withTransaction(async () => {
-        // Check current balance
+        // Verify user exists and has sufficient credits
         const user = await User.findById(userId).session(session);
         if (!user) {
           throw new Error("User not found");
@@ -59,7 +113,7 @@ export class CreditService {
           throw new Error("Insufficient credits");
         }
 
-        // Update user balance
+        // Atomically update user's credit balance and usage statistics
         const newBalance = currentBalance - amount;
         await User.findByIdAndUpdate(
           userId,
@@ -85,6 +139,7 @@ export class CreditService {
       return {
         success: true,
         newBalance: updatedUser?.credits_balance || 0,
+        totalCreditUsed: updatedUser?.total_credits_used || 0,
       };
     } catch (error) {
       console.error("Error deducting credits:", error);

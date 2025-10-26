@@ -11,11 +11,7 @@ export const INITIAL_USER_STATE: IUser = {
   full_name: "",
   email: "",
   is_verified: false,
-  plan_id: {
-    _id: "",
-    plan_id: "",
-    plan_name: "",
-  },
+  credits_balance: 0,
 };
 
 const Context = createContext<{

@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
+import formatCredits from "@/lib/utils/formatCredits";
 
 interface TransactionHistoryResponse {
   message: string;
@@ -236,7 +237,7 @@ export default function TransactionHistoryPage({
 
   const formatAmount = (amount: number, type: string) => {
     const prefix = type === "usage" ? "" : amount > 0 ? "+" : "";
-    return `${prefix}${amount}`;
+    return `${prefix}${formatCredits(amount)}`;
   };
 
   const refresh = () => {
@@ -576,17 +577,17 @@ export default function TransactionHistoryPage({
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">
+                  <tr className="border-b border-gray-200 dark:border-gray-700 w-full">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white w-[10%]">
                       Type
                     </th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">
+                    <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white w-[55%]">
                       Description
                     </th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-900 dark:text-white">
+                    <th className="text-right py-3 px-4 font-medium text-gray-900 dark:text-white w-[15%]">
                       Amount
                     </th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-900 dark:text-white">
+                    <th className="text-right py-3 px-4 font-medium text-gray-900 dark:text-white w-[20%]">
                       Date
                     </th>
                   </tr>
@@ -595,15 +596,15 @@ export default function TransactionHistoryPage({
                   {filteredTransactions.map((transaction) => (
                     <tr
                       key={transaction._id}
-                      className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 w-full"
                     >
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 w-[10%]">
                         <div className="flex items-center gap-2">
                           {getTransactionIcon(transaction.type)}
                           {getTransactionBadge(transaction.type)}
                         </div>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 w-[55%]">
                         <div className="space-y-1">
                           <p className="font-medium text-gray-900 dark:text-white">
                             {transaction.description}
@@ -620,7 +621,7 @@ export default function TransactionHistoryPage({
                           )}
                         </div>
                       </td>
-                      <td className="py-4 px-4 text-right">
+                      <td className="py-4 px-4 text-right w-[15%]">
                         <span
                           className={`font-semibold ${
                             transaction.amount > 0
@@ -632,7 +633,7 @@ export default function TransactionHistoryPage({
                           credits
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-right text-gray-500 dark:text-gray-400">
+                      <td className="py-4 px-4 text-right text-gray-500 dark:text-gray-400 w-[20%]">
                         {moment(transaction.createdAt).format(
                           "MMM DD, YYYY hh:mm A"
                         )}

@@ -11,11 +11,6 @@ export interface IUser {
   number_of_retries?: number;
   reset_password_token?: string;
   reset_password_expire?: Date;
-  plan_id: {
-    _id: string;
-    plan_id: string;
-    plan_name: string;
-  };
   // Credit system fields
   credits_balance?: number;
   total_credits_purchased?: number;
